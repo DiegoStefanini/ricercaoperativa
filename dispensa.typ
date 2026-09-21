@@ -76,7 +76,7 @@
 #v(1cm)
 #outline()
 
-= Tecniche di modellazione #text(10pt, weight: "regular")[(18 set — slide _Tecniche di modellazione_ 1-22, dispense pag. 9-17)]
+= Tecniche di modellazione
 
 Un modello ha sempre tre pezzi: *variabili* (le decisioni), *funzione obiettivo* (cosa minimizzo o massimizzo), *vincoli* (cosa devo rispettare).
 
