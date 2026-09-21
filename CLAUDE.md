@@ -11,7 +11,7 @@ Workflow generale: `../CLAUDE.md`.
 
 | Giorno | Materiale (`slide/`) | Grezzo | Argomento |
 |---|---|---|---|
-| 16 set 2026 (?) | `IntroRO2026.pdf` | — | introduzione, esame, problemi di ottimizzazione, risoluzione grafica. **Non ancora nella dispensa.** |
+| prima lezione | `IntroRO2026.pdf` | — | introduzione ed esame. **Nessun capitolo, per scelta di Diego**: l'unica parte utile è l'esempio Pintel di risoluzione grafica (p. 28-29), già nel riquadro sul gradiente. |
 | 18 set 2026 | `TecnicheModellazioneV_v3.pdf` p. 1-22 | `grezzi/2026-09-18.md` | fonderia, zaino, relazioni logiche (negazione, implicazione, and, or, xor) |
 
 Da riprendere: `TecnicheModellazioneV_v3.pdf` dalla p. 23 (140 pagine in tutto). `slide/EserciziarioTecincheModellazione.pdf` = esercizi di modellazione, utili per la prova 1.
