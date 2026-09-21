@@ -301,7 +301,7 @@ canvas(length: 0.6cm, {
   content((6.4, 1.3), text(8pt)[ottimo $(4, 1)$])
 }),
 [
-  Esempio delle slide introduttive (p. 28-29): $max z = 5x_P + 2x_C$ con $x_P <= 4$, $x_C <= 7$, $2x_P + x_C <= 9$.
+  Esempio: $max z = 5x_P + 2x_C$ con $x_P <= 4$, $x_C <= 7$, $2x_P + x_C <= 9$.
 
   - Le rette tratteggiate sono *linee di livello*: punti con lo stesso $z$. Sono perpendicolari al gradiente.
   - Per un *max* sposto la retta nella direzione del gradiente finché tocca ancora la regione: l'ultimo punto toccato è l'ottimo, $(4, 1)$ con $z = 22$.
