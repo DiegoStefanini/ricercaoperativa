@@ -74,7 +74,7 @@
   #text(14pt)[Diego Stefanini — prof. Stefano Novellani, a.a. 2026-27]
 ]
 #v(1cm)
-#outline()
+#outline(depth: 2)
 
 = Tecniche di modellazione
 
