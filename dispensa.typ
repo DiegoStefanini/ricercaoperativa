@@ -138,9 +138,7 @@ text(9pt)[
   ← non negatività
 ])
 
-=== Forma generale
-
-Al posto dei numeri metto dei *parametri*: $n = 4$ materiali, $K = 1000$ kg, $c_i$ costo al kg, $s_i$ e $m_i$ percentuali di silicio e manganese del materiale $i$, $underline(s)$ e $overline(s)$ silicio minimo e massimo, $underline(m)$ manganese minimo.
+Il modello si può scrivere in *forma generale*: al posto dei numeri metto dei *parametri*: $n = 4$ materiali, $K = 1000$ kg, $c_i$ costo al kg, $s_i$ e $m_i$ percentuali di silicio e manganese del materiale $i$, $underline(s)$ e $overline(s)$ silicio minimo e massimo, $underline(m)$ manganese minimo.
 
 $
 min z = sum_(i=1)^n c_i x_i quad "s.t." quad sum_(i=1)^n x_i = K, quad underline(s) K <= sum_(i=1)^(n-1) s_i x_i <= overline(s) K, quad sum_(i=1)^n m_i x_i >= underline(m) K, quad x_i >= 0
@@ -150,7 +148,7 @@ $
 
 Un'*istanza* è una configurazione concreta del problema: il modello generale con dei valori al posto dei parametri. Quello con i numeri sopra è un'istanza.]
 
-=== Un vincolo in percentuale
+Un vincolo che capita spesso è quello *in percentuale*:
 
 "Il materiale 1 deve essere almeno il 20% dei materiali ferrosi usati."
 
@@ -200,7 +198,7 @@ Tutte le variabili qui sono binarie: $x_A = 1$ se finanzio il progetto A. Nelle 
 
 #nota[Sono esempi separati: non devono valere tutti insieme.]
 
-=== Esattamente, almeno, al massimo uno
+#block(sticky: true)[Il caso più semplice: *esattamente, almeno o al massimo uno* fra A e B.]
 
 #block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 tv(("A", "B"),
@@ -218,7 +216,7 @@ tv(("A", "B"),
   *Negazione*: B = non A si scrive $x_B = 1 - x_A$ (è il caso 1).
 ]))
 
-=== Implicazione: se A allora C
+#block(sticky: true)[*Implicazione*: se finanzio A, allora devo finanziare anche C.]
 
 #block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 tv(("A", "C"), ($x_A <= x_C$, b => b.at(0) <= b.at(1))),
@@ -230,7 +228,7 @@ tv(("A", "C"), ($x_A <= x_C$, b => b.at(0) <= b.at(1))),
   Il "se e solo se" (relazione biunivoca) è l'uguaglianza: $x_A = x_C$.
 ]))
 
-=== And: A e B insieme
+#block(sticky: true)[*And*: si vuole $C = A and B$.]
 
 #block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 tv(("A", "B", "C"),
@@ -248,7 +246,7 @@ tv(("A", "B", "C"),
   Con tre progetti: "se finanzio A, B e C devo finanziare D" è $x_D >= x_A + x_B + x_C - 2$.
 ]))
 
-=== Or: almeno uno fra A e B
+#block(sticky: true)[*Or*: si vuole $C = A or B$.]
 
 #block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 tv(("A", "B", "C"),
@@ -263,7 +261,7 @@ tv(("A", "B", "C"),
   Insieme danno $C = A or B$.
 ]))
 
-=== Or esclusivo: esattamente uno fra A e B
+#block(sticky: true)[*Or esclusivo*: si vuole C finanziato quando c'è esattamente uno fra A e B.]
 
 #block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 tv(("A", "B", "C"),
