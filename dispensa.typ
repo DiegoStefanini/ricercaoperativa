@@ -85,6 +85,84 @@
   }
 })
 
+// grafo orientato: archi = ((a, b), ...), etichette = ("a-b": contenuto), evid = ("a-b", ...) archi in blu,
+// note = (nome: ((dx, dy), contenuto)) scritte accanto ai nodi
+#let rete(nodi, archi, etichette: (:), evid: (), note: (:), colori: (:), scala: 0.8) = canvas(length: scala * 1cm, {
+  import draw: *
+  let r = 0.32
+  for (a, b) in archi {
+    let (p, q) = (nodi.at(a), nodi.at(b))
+    let (dx, dy) = (q.at(0) - p.at(0), q.at(1) - p.at(1))
+    let l = calc.sqrt(dx * dx + dy * dy)
+    let (ux, uy) = (dx / l, dy / l)
+    let c = if evid.contains(a + "-" + b) { blu } else { grigio }
+    line((p.at(0) + r * ux, p.at(1) + r * uy), (q.at(0) - r * ux, q.at(1) - r * uy),
+      stroke: (if c == blu { 1.6pt } else { 0.8pt }) + c, mark: (end: "stealth", fill: c))
+    let e = etichette.at(a + "-" + b, default: none)
+    if e != none { content((p.at(0) + dx / 2, p.at(1) + dy / 2), box(fill: white, inset: 1.5pt, text(7pt, e))) }
+  }
+  for (n, p) in nodi {
+    circle(p, radius: r, fill: colori.at(n, default: white), stroke: 0.7pt)
+    content(p, text(8pt, n))
+  }
+  for (n, (d, c)) in note {
+    let p = nodi.at(n)
+    content((p.at(0) + d.at(0), p.at(1) + d.at(1)), text(7pt, c))
+  }
+})
+
+// barche dell'esempio: (arrivo, partenza). Due barche sono incompatibili se gli intervalli si toccano.
+#let barche = ((0, 2), (1, 2), (2.5, 5.5))
+#let sovrapposte(a, b) = calc.max(a.at(0), b.at(0)) <= calc.min(a.at(1), b.at(1))
+// tutti i turni possibili di un molo: sottoinsiemi di barche senza sovrapposizioni (calcolati, non scritti a mano)
+#let turni = (range(1, calc.pow(2, barche.len()))
+  .map(k => range(barche.len()).filter(i => calc.rem(calc.quo(k, calc.pow(2, i)), 2) == 1))
+  .filter(s => s.all(i => s.all(j => i == j or not sovrapposte(barche.at(i), barche.at(j)))))
+  .sorted(key: s => s.len() * 100 + s.fold(0, (a, i) => a * 10 + i)))
+// linea del tempo: una riga per ogni gruppo di barche
+#let tempi(righe, etichette: none) = canvas(length: 0.85cm, {
+  import draw: *
+  let n = righe.len()
+  for (k, s) in righe.enumerate() {
+    let y = (n - k) * 0.62
+    line((0, y), (6, y), stroke: 0.4pt + grigio)
+    if etichette != none { content((-0.25, y), anchor: "east", text(8pt, etichette.at(k))) }
+    for i in s {
+      let (a, b) = barche.at(i)
+      rect((a, y - 0.22), (b, y + 0.22), fill: rgb("#d6e4ff"), stroke: 0.6pt + blu)
+      content(((a + b) / 2, y), text(8pt)[#(i + 1)])
+    }
+  }
+  line((0, 0), (6.3, 0), mark: (end: "stealth", fill: black))
+  for t in range(7) { line((t, 0), (t, -0.1)); content((t, -0.35), text(7pt)[#t]) }
+  content((6.9, 0), text(7pt)[ore])
+})
+// cammino di un camion: "d" deposito, "i…" importatore, "e…" esportatore
+#let catena(..n) = box(baseline: 30%, stack(dir: ltr, spacing: 3pt, ..n.pos().map(x => box(width: 1.55em, height: 1.55em, radius: 50%, stroke: 0.6pt,
+  fill: if x == "d" { luma(225) } else if x.starts-with("i") { rgb("#d6e4ff") } else { rgb("#fff3c4") },
+  align(center + horizon, text(8pt, if x.len() == 1 { math.italic(x) } else { math.attach(math.italic(x.at(0)), b: x.slice(1)) }))))
+  .intersperse(box(height: 1.55em, align(horizon, text(9pt, sym.arrow.r))))))
+
+// home restaurant: ingredienti, casse e piatti (nome, quali ingredienti usa, valore)
+#let ingr = ($M_f$, $M_a$, $O_i$, $O_r$, $S$)
+#let ingrnomi = ("filetto", "avanzo / ossa", "foglie", "radici", "salsa")
+#let ingrcassa = ($M$, $M$, $O$, $O$, $S$)
+#let piatti = (
+  ("Tagliata con insalata", (1, 1, 1, 0, 0), 6),
+  ("Stufato rustico", (1, 1, 0, 0, 1), 3),
+  ("Filetto al sale", (1, 0, 0, 0, 0), 2),
+  ("Insalata di carne", (1, 0, 1, 0, 1), 5),
+  ("Filetto con contorno", (1, 1, 1, 1, 0), 9),
+  ("Stufato classico", (1, 1, 0, 0, 0), 10),
+  ("Salsa del giorno", (0, 0, 0, 0, 1), 7),
+  ("Piatto gourmet", (1, 1, 1, 1, 1), 8),
+)
+// valori di z permessi da un vincolo quando nel menù ci sono k piatti
+#let zperm(k, f) = {
+  let v = (0, 1).filter(z => f(k, z))
+  if v.len() == 2 { [0 o 1] } else if v.len() == 1 { strong[#v.at(0)] } else { no }
+}
+
 #let si = text(fill: verde, weight: "bold")[✓]
 #let no = text(fill: red, weight: "bold")[✗]
 
@@ -218,7 +296,7 @@ canvas(length: 0.6cm, {
 ])
 ]
 
-== Variabili binarie: il problema dello zaino
+== Variabili binarie: zaino e relazioni logiche
 
 Un investitore ha un capitale $B$ e $n$ progetti. Il progetto $i$ costa $c_i$ e rende $w_i$. Quali progetti finanzio per rendere il più possibile senza sforare il budget?
 
@@ -250,9 +328,7 @@ $,
   $sum c_i x_i <= B$ è il *vincolo di budget*.
 ])
 
-== Relazioni logiche
-
-Tutte le variabili qui sono binarie: $x_A = 1$ se finanzio il progetto A. Nelle tabelle, ✓ = combinazione permessa dal vincolo.
+Con le variabili binarie si scrivono anche le *relazioni logiche* fra le decisioni: "se finanzio questo devo finanziare quello", "al massimo uno fra questi". Ogni relazione diventa un vincolo lineare. Tutte le variabili qui sono binarie: $x_A = 1$ se finanzio il progetto A. Nelle tabelle, ✓ = combinazione permessa dal vincolo.
 
 #nota[Sono esempi separati: non devono valere tutti insieme.]
 
@@ -449,7 +525,7 @@ Il vincolo $sum x_(i j) = n$ ora è *ridondante*: se ogni vertice tocca 2 lati, 
 
 #nota[È il modello dell'albero di copertura più i vincoli di grado 2. Non è l'unico modello del TSP: si può usare una variabile per ogni ciclo hamiltoniano (ma sono un numero esponenziale e bisogna generarli tutti), oppure sostituire i vincoli di taglio con vincoli che vietano direttamente i sottocicli.]
 
-== Assegnamento e semi-assegnamento
+== Assegnamento, semi-assegnamento e colorazione di grafi
 
 Un'azienda deve assegnare delle attività a dei lavoratori. Lavoratori $L$ e attività $A$ sono due insiemi con lo stesso numero $n$ di elementi. Assegnare il lavoratore $i in L$ all'attività $j in A$ costa $c_(i j)$. Tutte le attività vanno assegnate e ogni lavoratore riceve *una e una sola* attività; si vuole il costo minimo.
 
@@ -505,6 +581,7 @@ $
 min z = & sum_(f in F) y_f &&&& #text(9pt)[← numero di frequenze usate] \
 & sum_(f in F) x_(i f) = 1 quad && i in S quad && #text(9pt)[← ogni antenna ha una sola frequenza] \
 & x_(i f) + x_(j f) <= 1 quad && {i, j} in E, f in F quad && #text(9pt)[← antenne vicine: frequenze diverse] \
+& y_f >= x_(i f) quad && i in S, f in F quad && #text(9pt)[← una frequenza assegnata è una frequenza usata] \
 & x_(i f) in {0, 1} quad && i in S, f in F \
 & y_f in {0, 1} quad && f in F
 $
@@ -512,7 +589,296 @@ $
 Ogni vincolo è una relazione logica già vista:
 - $sum_f x_(i f) = 1$ è "*esattamente uno*": il semi-assegnamento (per ogni antenna, non per ogni frequenza);
 - $x_(i f) + x_(j f) <= 1$ è "*al massimo uno*": fra due antenne vicine $i$ e $j$ al massimo una usa $f$. Si scrive per ogni lato del grafo di incompatibilità e per ogni frequenza.
+- $y_f >= x_(i f)$ è il *legame* fra le due famiglie di variabili. È l'implicazione "se assegno $f$ all'antenna $i$, allora $f$ è usata" ($x_(i f) <= y_f$). Se $x_(i f) = 1$ il vincolo forza $y_f = 1$. Se nessuna antenna usa $f$ il vincolo dice solo $y_f >= 0$ e $y_f$ sarebbe libera: ma la funzione obiettivo è un $min$, quindi $y_f$ va a 0 da sola.
 
 La funzione obiettivo conta le frequenze usate: $y$ è un "vettorino" di 0 e 1 lungo $|F|$, e la sua somma è il numero di 1.
 
-#nota[Il modello *non è ancora finito*: nessun vincolo lega le $y$ alle $x$. Così com'è, il $min$ metterebbe tutte le $y_f$ a 0 (costo 0) mentre le antenne usano comunque le frequenze. Il pezzo mancante è il prossimo argomento.]
+Senza quest'ultimo vincolo il modello sarebbe sbagliato: niente lega le $y$ alle $x$, quindi il $min$ metterebbe tutte le $y_f$ a 0 (costo 0) mentre le antenne usano comunque le frequenze.
+
+#nota[Ogni volta che un modello ha *due o più famiglie di variabili* serve un vincolo che le leghi. Il significato che do a una variabile quando la definisco a parole ("$y_f$ vale 1 se uso la frequenza") è come un commento nel codice: il solutore non lo legge. Quel significato deve essere imposto dai vincoli.]
+
+Questo modello è la formulazione di un problema classico, la *colorazione di un grafo* (graph coloring): dare un colore a ogni vertice, usando il minor numero di colori, in modo che due vertici uniti da un lato abbiano colori diversi. Lo stesso modello risolve problemi che sembrano non avere niente in comune con le antenne, come il prossimo.
+
+*Moli e barche (ordinamento di lavori su macchine)*. Un porto ha un insieme di moli $M = {1, dots, k}$, tutti uguali. Ogni giorno arrivano $n$ barche, $B = {1, dots, n}$. La barca $i$ arriva all'istante $t_i >= 0$ e occupa il molo per una durata $d_i$ per scaricare, quindi riparte a $t_i + d_i$. Le barche non possono aspettare: vanno servite appena arrivano. Ogni barca va assegnata a *esattamente un molo*, e due barche non possono stare sullo stesso molo in intervalli di tempo che si sovrappongono. Si vuole usare il *minor numero di moli*.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  tempi(((0,), (1,), (2,)), etichette: ([barca 1], [barca 2], [barca 3])),
+  [
+    Esempio con tre barche: la 1 sta in porto nell'intervallo $[0, 2]$, la 2 in $[1, 2]$, la 3 in $[2.5, 5.5]$.
+
+    La 1 e la 2 si sovrappongono (quando arriva la 2, la 1 è ancora al molo): non possono condividere un molo. La 3 arriva quando le altre due sono già ripartite: può usare il molo di una delle due. Bastano 2 moli.
+  ])
+
+Viene da pensare a una variabile per ogni molo e per ogni istante di tempo ("il molo $m$ è occupato all'istante $t$"). Non conviene: gli istanti sono infiniti, e per usarli bisognerebbe spezzare il tempo in intervallini (*discretizzare*). Ma soprattutto *il tempo qui non è una decisione*: arrivo e durata sono dati, la barca $i$ occupa il molo da $t_i$ a $t_i + d_i$ qualunque cosa io scelga. Una variabile serve per ciò che devo decidere; ciò che so già è un dato. (Se potessi scegliere *quando* servire una barca, allora sì, servirebbe una variabile per il tempo.)
+
+Il tempo si usa *prima* di scrivere il modello, sui dati, per costruire il *grafo di incompatibilità* $G = (B, E)$: i vertici sono le barche, e c'è un lato fra due barche quando i loro intervalli hanno almeno un istante in comune,
+$ {i, j} in E quad "se" quad [t_i, t_i + d_i] ∩ [t_j, t_j + d_j] != emptyset $
+($∩$ è l'intersezione, $emptyset$ l'insieme vuoto: "l'intersezione non è vuota"). Nell'esempio $E$ ha un solo lato, ${1, 2}$.
+
+Le decisioni sono due, come per le antenne: *su quale molo va ogni barca* e *quali moli uso*.
+$ x_(i m) = cases(1 "se assegno la barca" i in B "al molo" m in M, 0 "altrimenti") quad quad y_m = cases(1 "se uso il molo" m in M, 0 "altrimenti") $
+
+$
+min z = & sum_(m in M) y_m &&&& #text(9pt)[← numero di moli usati] \
+& sum_(m in M) x_(i m) = 1 quad && i in B quad && #text(9pt)[← ogni barca ha un solo molo] \
+& x_(i m) + x_(j m) <= 1 quad && {i, j} in E, m in M quad && #text(9pt)[← barche incompatibili: moli diversi] \
+& y_m >= x_(i m) quad && i in B, m in M quad && #text(9pt)[← un molo con una barca è un molo usato] \
+& x_(i m) in {0, 1} quad && i in B, m in M \
+& y_m in {0, 1} quad && m in M
+$
+
+È *lo stesso modello* dell'assegnamento di frequenze, con altri nomi:
+
+#align(center, table(columns: 4, align: center,
+  [], [frequenze], [moli e barche], [lavori su macchine],
+  [vertici del grafo], [antenne], [barche], [lavori],
+  [colori], [frequenze], [moli], [macchine],
+  [lato = incompatibili], [troppo vicine], [intervalli sovrapposti], [lavori nello stesso momento],
+))
+
+Per questo il problema si chiama in generale *ordinamento di lavori su macchine*: le macchine sono i moli, i lavori sono le barche. Avevamo visto che lo stesso problema si può scrivere con modelli diversi; qui succede il contrario, *lo stesso modello risolve problemi diversi*.
+
+== Selezione di sottoinsiemi: partizione, copertura, riempimento
+
+Nel modello dei moli la soluzione è costruita a pezzettini: una variabile per ogni coppia barca-molo. Niente vieta di usare *pezzi più grandi*. Invece di decidere barca per barca, elenco tutti i *turni* possibili di un molo (cioè tutti i gruppi di barche che un molo può servire in una giornata senza sovrapposizioni) e uso una variabile per ogni turno: lo scelgo oppure no.
+
+Sia $cal(F)$ la famiglia di tutti i sottoinsiemi $S subset.eq B$ di barche che *non si sovrappongono fra loro*, e che quindi possono stare tutte sullo stesso molo. Ogni $S in cal(F)$ è un possibile turno (o schedulazione) di un molo. $cal(F)$ è un "insieme di insiemi". Con le tre barche dell'esempio i turni possibili sono #turni.len():
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  tempi(turni, etichette: turni.enumerate().map(((k, s)) => $S_#(k + 1)$)),
+  [
+    $cal(F) = { #turni.map(s => ${#s.map(i => str(i + 1)).join(",")}$).join($,$) }$
+
+    Un molo può servire una barca sola, oppure la 1 e poi la 3, oppure la 2 e poi la 3. Il turno ${1, 2}$ *non c'è*: le barche 1 e 2 sono incompatibili. L'incompatibilità è già sistemata quando costruisco $cal(F)$, sui dati, e nel modello non compare più.
+
+    I moli sono tutti uguali: non serve dire *quale* molo fa un turno, basta sapere quali turni vengono fatti.
+  ])
+
+*Variabili*: una per turno,
+$ y_S = cases(1 "se uso un molo con il gruppo di barche" S in cal(F), 0 "altrimenti") $
+
+*Funzione obiettivo*: ogni turno scelto occupa un molo, quindi i moli usati sono $sum_(S in cal(F)) y_S$, da minimizzare.
+
+*Vincoli*: ogni barca deve essere servita, e una volta sola. La barca 1 compare nei turni $S_1$ e $S_4$: fra questi due ne devo scegliere esattamente uno. Stesso discorso per le altre:
+#let ys = i => turni.enumerate().filter(((k, s)) => s.contains(i)).map(((k, s)) => $y_#(k + 1)$).join($+$)
+$ #ys(0) = 1 quad "(barca 1)" quad quad #ys(1) = 1 quad "(barca 2)" quad quad #ys(2) = 1 quad "(barca 3)" $
+
+In generale, per ogni barca $i$ sommo le variabili dei soli turni che la contengono:
+
+$
+min z = & sum_(S in cal(F)) y_S &&&& #text(9pt)[← numero di moli usati] \
+& sum_(S in cal(F) : i in S) y_S = 1 quad && forall i in B quad && #text(9pt)[← ogni barca sta in un solo turno scelto] \
+& y_S in {0, 1} quad && forall S in cal(F)
+$
+
+Una soluzione è $y_2 = y_4 = 1$ e le altre a 0: un molo serve la barca 2, un altro serve la 1 e poi la 3. Due moli.
+
+Lo stesso vincolo si scrive in modo più comodo con un *parametro binario*. Numero i turni con un insieme di indici $P = {1, dots, #turni.len()}$ ($y_p$ al posto di $y_S$) e definisco
+$ a_(i p) = cases(1 "se la barca" i in B "è nel turno" p in P, 0 "altrimenti") $
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  table(columns: turni.len() + 1, align: center, inset: 5pt,
+    $a_(i p)$, ..range(turni.len()).map(k => $p = #(k + 1)$),
+    ..range(barche.len()).map(i => ($i = #(i + 1)$,) + turni.map(s => if s.contains(i) { strong[1] } else { text(fill: grigio)[0] })).flatten()),
+  [
+    Ogni colonna è un turno, ogni riga una barca. Il vincolo della barca $i$ si legge sulla riga $i$: moltiplico ogni $y_p$ per il numero sopra e sommo. Dove c'è 0 la variabile sparisce dalla somma, dove c'è 1 resta.
+
+    Riga 1: $1 y_1 + 0 y_2 + 0 y_3 + 1 y_4 + 0 y_5 = 1$, cioè $y_1 + y_4 = 1$ come prima.
+  ])
+
+$
+min z = sum_(p in P) y_p quad "s.t." quad sum_(p in P) a_(i p) y_p = 1 quad forall i in B, quad quad y_p in {0, 1} quad forall p in P
+$
+
+#nota[*Parametro o variabile?* $a_(i p)$ è un *parametro*: un dato, come gli orari delle barche. Una volta elencati i turni so già dove vale 1 e dove 0, non c'è niente da decidere, e infatti non compare fra le variabili del modello (non gli si scrive il dominio). $x_(i m)$ nel modello di prima era una *variabile*: a quale molo va la barca lo decide il solutore.
+
+Il parametro è anche più flessibile della scrittura con gli insiemi: può valere 2, 3, … per dire "quante volte", non solo "sì o no". Tornerà utile.]
+
+I due modelli a confronto: con le $x_(i m)$ ho poche variabili (barche × moli) e molti vincoli; con i turni ho *pochissimi vincoli* (uno per barca) ma *tantissime variabili*, una per ogni gruppo compatibile, e i gruppi possono essere un numero esponenziale. Questi modelli funzionano molto bene quando le variabili si generano un po' alla volta invece che tutte insieme, ma è una tecnica che nel corso non si vede.
+
+Scegliere turni in modo che ogni barca stia in *esattamente uno* vuol dire dividere $B$ in gruppi che non si sovrappongono e non lasciano fuori nessuno: una *partizione* di $B$. Cambiando il segno del vincolo si ottengono tre problemi con un nome:
+
+#align(center, table(columns: (auto, auto, auto, auto), align: (left, center, left, left), inset: 7pt,
+  [problema], [per ogni $i in B$], [ogni elemento sta in…], [per le barche],
+  [*partizione* \ #text(9pt)[set partitioning]], $display(sum_(S in cal(F) : i in S) y_S = 1)$, [esattamente un insieme scelto], [ogni barca a un solo molo],
+  [*copertura* \ #text(9pt)[set covering]], $display(sum_(S in cal(F) : i in S) y_S >= 1)$, [almeno un insieme scelto], [ogni barca ad almeno un molo],
+  [*riempimento* \ #text(9pt)[set packing]], $display(sum_(S in cal(F) : i in S) y_S <= 1)$, [al più un insieme scelto], [ogni barca al più a un molo],
+))
+
+#nota[I nomi sono nomenclatura: il prof dice che non li chiederà ("e poi mi smentirò"). Servono come campanello: se un problema è una partizione, una copertura o un riempimento, il modello c'è già.]
+
+*Selezione di una configurazione: l'home restaurant*. All'esame e al compitino l'esercizio di modellazione parte da un *testo*, come questo. Tommaso ha un home restaurant e sabato sera ha una prenotazione. La mattina va al mercato con *16,5 €*. Gli ingredienti si vendono solo in *casse* già fatte, che non si possono dividere:
+
+#align(center, stack(dir: ltr, spacing: 0.8em,
+  ..(($M$, "Cassa Proteica", [1 filetto $M_f$ \ 1 avanzo / ossa $M_a$], "6,5 €"),
+     ($O$, "Cassa Orto", [1 foglie miste $O_i$ \ 1 radici $O_r$], "4,0 €"),
+     ($S$, "Barattolo Salse", [1 salsa $S$], "1,5 €")).map(((s, n, c, p)) =>
+    box(stroke: 0.6pt, inset: 7pt, width: 5cm, height: 1.9cm, fill: rgb("#eef4ff"), align(left)[*#n* (#s) #h(1fr) *#p* \ #text(9pt, c)]))))
+
+Deve decidere *quante casse comprare* e *quali piatti mettere nel menù*. Ogni piatto usa alcuni ingredienti (una porzione ciascuno) e ha un *valore* $v_c$, cioè quanto piace ai clienti. Tommaso vuole il menù di valore totale massimo. In più, se il menù ha *almeno 4 piatti* guadagna un *bonus di 10 punti* (menù vario).
+
+#align(center, table(columns: 8, align: (center, left) + (center,) * 6, inset: 5pt,
+  [$c$], [piatto], ..ingr, [valore $v_c$],
+  ..piatti.enumerate().map(((c, (n, u, v))) => ([#(c + 1)], n) + u.map(a => if a == 1 { strong[1] } else { text(fill: grigio)[0] }) + ([#v],)).flatten()))
+
+La tabella piatto-ingrediente è una matrice di 0 e 1: è di nuovo un parametro binario.
+
+*Variabili*. Le decisioni sono tre:
+- quali piatti fare: $x_c in {0, 1}$ per ogni piatto $c in C = {1, dots, 8}$, vale 1 se il piatto $c$ è nel menù;
+- quante casse comprare: $y_M, y_O, y_S$. Di una cassa se ne può comprare più di una, quindi non bastano variabili binarie: sono *intere*, $y in NN_0$ (i numeri naturali con lo zero: 0 non la compro, 1 ne compro una, 2 ne compro due…). È un'estensione delle binarie: dicono *se* faccio una cosa e *quante volte*;
+- se prendo il bonus: $z in {0, 1}$, vale 1 se il menù ha almeno 4 piatti.
+
+*Funzione obiettivo*: il valore di ogni piatto scelto, più il bonus $b = 10$ se $z = 1$.
+$ max w = sum_(c in C) v_c x_c + b z quad quad "cioè" quad max #piatti.enumerate().map(((c, p)) => $#p.at(2) x_#(c + 1)$).join($+$) + 10 z $
+
+*Vincolo del bonus*. Così com'è, $z$ è slegata dal resto: il $max$ la metterebbe sempre a 1 e prenderebbe il bonus anche con un piatto solo. È la situazione delle $y_f$ con le antenne: serve un vincolo che leghi $z$ alle $x_c$. Deve impedire $z = 1$ quando i piatti sono meno di 4:
+$ sum_(c in C) x_c >= 4 z quad quad "(o, che è lo stesso," quad z <= 1/4 sum_(c in C) x_c ")" $
+Con $z = 0$ dice $sum x_c >= 0$, sempre vero. Con $z = 1$ dice $sum x_c >= 4$: posso avere $z = 1$ solo con almeno 4 piatti. Visto dall'altra parte: con 3 piatti $z <= 3/4$, e una binaria $<= 3/4$ può solo valere 0.
+
+E quando i piatti sono 4 o più? Il vincolo permette sia $z = 0$ sia $z = 1$. Ma $z$ ha coefficiente positivo ($+10$) in una funzione obiettivo di *massimo*: appena può, il modello la mette a 1. *Basta questo vincolo* perché la funzione obiettivo spinge dalla parte giusta.
+
+Non sempre si è così fortunati. Se $z$ non comparisse nella funzione obiettivo (o se il suo coefficiente spingesse dalla parte sbagliata), niente la obbligherebbe a valere 1 con 4 piatti o più. Per avere "$z = 1$ *se e solo se* i piatti sono almeno 4" servirebbe un secondo vincolo, che obbliga $z$ a 1:
+$ sum_(c in C) x_c <= 3 + (|C| - 3) z $
+($|C| = 8$ è il numero di piatti.) Con $z = 0$ dice $sum x_c <= 3$: per fare 4 piatti o più devo per forza avere $z = 1$. Con $z = 1$ dice $sum x_c <= |C|$, sempre vero. La tabella mostra, per ogni numero di piatti nel menù, quali valori di $z$ lascia passare ciascun vincolo:
+
+#align(center, table(columns: 10, align: center, inset: 5pt,
+  [piatti nel menù], ..range(9).map(k => [#k]),
+  $sum x_c >= 4 z$, ..range(9).map(k => zperm(k, (k, z) => k >= 4 * z)),
+  $sum x_c <= 3 + 5 z$, ..range(9).map(k => zperm(k, (k, z) => k <= 3 + 5 * z)),
+  [tutti e due], ..range(9).map(k => zperm(k, (k, z) => k >= 4 * z and k <= 3 + 5 * z)),
+))
+
+Il primo vincolo è del tipo "*posso* solo se" (tiene $z$ a 0), il secondo del tipo "*devo* se" (spinge $z$ a 1): lo stesso schema delle relazioni logiche.
+
+*Vincoli sugli ingredienti*. I piatti scelti non possono usare più ingredienti di quelli comprati. Ogni Cassa Proteica contiene un filetto, quindi i filetti disponibili sono $y_M$; quelli che servono sono tanti quanti i piatti scelti che usano il filetto. Un vincolo per ogni ingrediente, letto dalle colonne della tabella:
+
+#let usa = h => piatti.enumerate().filter(((c, p)) => p.at(1).at(h) == 1).map(((c, p)) => $x_#(c + 1)$).join($+$)
+#align(center, grid(columns: 4, align: (left, right, center, left), inset: 4pt,
+  ..range(ingr.len()).map(h => ([#ingrnomi.at(h) #ingr.at(h):], $#usa(h)$, $<=$, $y_#ingrcassa.at(h)$)).flatten()))
+
+Se faccio i piatti 5 e 6, tutti e due con il filetto, il primo vincolo dà $y_M >= 2$: due casse proteiche. Può capitare di comprare ingredienti che poi non uso (con le casse arrivano anche quelli).
+
+Scrivere cinque vincoli a mano va bene qui, ma non con cento ingredienti. La stessa cosa si scrive in forma generale in due modi. Con gli *insiemi*: chiamo $H = {M_f, M_a, O_i, O_r, S}$ gli ingredienti e $C_h$ l'insieme dei piatti che usano l'ingrediente $h$; per il filetto, $sum_(c in C_(M_f)) x_c <= y_M$. Oppure con il *parametro binario* $a_(h c)$, che vale 1 se il piatto $c$ usa l'ingrediente $h$ (è la tabella dei piatti): $sum_(c in C) a_(M_f, c) x_c <= y_M$. La somma è su tutti i piatti, e quelli che non usano il filetto spariscono perché moltiplicati per 0.
+
+Il parametro permette di arrivare a *un solo vincolo per tutti gli ingredienti*. Chiamo $J = {M, O, S}$ i tipi di cassa e aggiungo un secondo parametro, $d_(h j) = 1$ se l'ingrediente $h$ sta nella cassa $j$:
+$ underbrace(sum_(c in C) a_(h c) x_c, "quanto ne serve") <= underbrace(sum_(j in J) d_(h j) y_j, "quanto ne compro") quad forall h in H $
+
+#nota[Questa forma regge anche casi che le altre non reggono, cambiando solo i numeri nei parametri: un piatto che usa *due* porzioni dello stesso ingrediente ($a_(h c) = 2$), una cassa che contiene *più unità* di un ingrediente ($d_(h j) = 2$), lo stesso ingrediente presente in *casse diverse* (più $d_(h j)$ a 1 sulla stessa riga). All'esame va bene anche la forma lunga.]
+
+*Vincolo di budget*, come nello zaino: con $k_j$ costo della cassa $j$ e $B = 16.5$,
+$ sum_(j in J) k_j y_j <= B quad quad "cioè" quad 6.5 y_M + 4 y_O + 1.5 y_S <= 16.5 $
+Il $<=$ perché posso spendere anche meno. Non serve una variabile in più per "quanto spendo": è già la somma a sinistra.
+
+Il modello completo, con i domini (che vanno sempre scritti: il solutore non sa da solo che $z$ è binaria):
+$
+max w = & sum_(c in C) v_c x_c + b z &&&& #text(9pt)[← valore del menù più bonus] \
+& sum_(c in C) x_c >= 4 z &&&& #text(9pt)[← bonus solo con almeno 4 piatti] \
+& sum_(c in C) a_(h c) x_c <= sum_(j in J) d_(h j) y_j quad && forall h in H quad && #text(9pt)[← ingredienti usati ≤ comprati] \
+& sum_(j in J) k_j y_j <= B &&&& #text(9pt)[← budget] \
+& x_c in {0, 1} quad forall c in C, quad y_j in NN_0 quad forall j in J, quad z in {0, 1}
+$
+
+*Instradamento: una variabile per ogni cammino*. Nei moli la famiglia $cal(F)$ si poteva elencare guardando gli orari. Spesso la famiglia non è data: va costruita dalle regole del testo. La Trans-Port, azienda di logistica, deve pianificare i viaggi dei suoi camion. Ogni camion parte dal *deposito* $d$, *consegna* container pieni agli *importatori* (insieme $I$) e/o *ritira* container vuoti dagli *esportatori* (insieme $E$), poi torna a $d$. Le regole:
+- un camion porta *al massimo due container*;
+- *prima consegna, poi ritira*: mai un esportatore prima di un importatore;
+- si conosce la distanza $c_(h k)$ fra ogni coppia di punti (deposito, importatori, esportatori), uguale nei due versi;
+- ogni importatore $i$ ha una domanda $q_i$ di container da ricevere, ogni esportatore $e$ una domanda $q_e$ di container da far ritirare;
+- i camion sono quanti ne servono (un camion rientrato può ripartire).
+Si vogliono soddisfare tutte le domande percorrendo la *minima distanza totale*.
+
+Con due container al massimo e la regola "prima consegno, poi ritiro", i giri possibili sono pochi: al più 2 fermate dagli importatori seguite da al più 2 dagli esportatori. Si dividono per numero di fermate:
+
+#align(center, table(columns: 3, align: (center, left, left), inset: 6pt,
+  [insieme], [cammini], [perché non ce ne sono altri],
+  [$P_1$ \ 1 fermata], [#catena("d", "i", "d") \ #v(2pt) #catena("d", "e", "d")], [],
+  [$P_2$ \ 2 fermate], [#catena("d", "i1", "i2", "d") \ #v(2pt) #catena("d", "i", "e", "d") \ #v(2pt) #catena("d", "e1", "e2", "d")], [manca $d -> e -> i -> d$: \ prima si consegna, poi si ritira],
+  [$P_3$ \ 3 fermate], [#catena("d", "i1", "i2", "e", "d") \ #v(2pt) #catena("d", "i", "e1", "e2", "d")], [mai tre importatori o tre esportatori: \ il camion porta due container],
+  [$P_4$ \ 4 fermate], [#catena("d", "i1", "i2", "e1", "e2", "d")], [parte con 2 pieni, torna con 2 vuoti],
+))
+
+L'insieme di tutti i cammini è $P = P_1 union P_2 union P_3 union P_4$. Da qui in poi tutto il lavoro è sui dati, prima del modello:
+- il *costo* $c_p$ del cammino $p$ è la somma delle distanze dei suoi tratti. Per il cammino $d -> i -> e -> d$ è $c_(d i) + c_(i e) + c_(e d)$. È un parametro: lo calcolo una volta generati i cammini;
+- nulla vieta $i_1 = i_2$ (o $e_1 = e_2$): lo stesso camion porta *due container allo stesso cliente*, e il tratto fra le due "fermate" costa 0. Per questo il parametro che dice se un cammino passa da un cliente non è binario: $a_(p i)$ = numero di volte (0, 1 o 2) che il cammino $p$ visita l'importatore $i$, e $a_(p e)$ lo stesso per l'esportatore $e$. Ecco il caso in cui il parametro vale 2;
+- se un cliente è sia importatore sia esportatore, lo si tratta come due punti diversi a distanza 0.
+
+*Variabili*: $y_p$ = numero di camion che fanno il cammino $p in P$. È intera e non binaria perché lo stesso giro può servire più volte (un importatore che aspetta 6 container riceve più camion).
+
+$
+min & sum_(p in P) c_p y_p &&&& #text(9pt)[← distanza totale] \
+& sum_(p in P) a_(p i) y_p = q_i quad && forall i in I quad && #text(9pt)[← ogni importatore riceve i suoi container] \
+& sum_(p in P) a_(p e) y_p = q_e quad && forall e in E quad && #text(9pt)[← da ogni esportatore ritiro i suoi container] \
+& y_p in NN_0 quad && forall p in P
+$
+
+I vincoli hanno la forma della partizione, con $q_i$ al posto di 1: sommo i cammini che passano da $i$, ciascuno contato quanti container gli lascia, e il totale deve essere la sua domanda. La capacità del camion e l'ordine consegna-ritiro *non compaiono nel modello*: sono già dentro la costruzione di $P$, come l'incompatibilità delle barche era dentro $cal(F)$.
+
+#nota[Tutta la difficoltà sta nel generare i cammini; il modello poi è semplice. Qui si può fare perché i cammini hanno al più 4 fermate. Se i camion potessero fare giri lunghi i cammini sarebbero un numero enorme (cresce come il fattoriale, $n! = n dot (n - 1) dots 2 dot 1$, il numero di modi di mettere in ordine $n$ fermate): esistono algoritmi che li generano solo quando servono (generazione di colonne), ma nel corso non si vedono.]
+
+== Problemi di flusso su rete
+
+Finora le variabili erano *binarie* (faccio / non faccio) o *intere* (quante volte lo faccio). Anche una variabile *continua*, cioè un numero reale qualunque, può portare un'informazione logica: se vale 0 quella scelta non viene fatta, se è positiva la scelta è fatta e il valore dice *quanto*. Una sola variabile fa da interruttore e da quantità.
+
+Questa idea si usa soprattutto nei *problemi di flusso su rete*. Una rete è un grafo orientato: qualcosa (merce, energia, dati, acqua, gas) si muove lungo gli archi, e le variabili dicono *quanto* ne passa su ogni arco. Di conseguenza dicono anche quali archi vengono usati davvero.
+
+*Il problema delle fognature*. Una città ha 4 quartieri, i vertici $V = {1, 2, 3, 4}$. Ogni quartiere produce una quantità nota di acque reflue, in m³/h: 1 i quartieri 1, 2 e 3, e 0,5 il quartiere 4. Tutta l'acqua va portata a un unico depuratore, il nodo 5. Le condotte che si possono costruire sono gli archi $A = {(1, 5), (2, 1), (2, 3), (2, 5), (3, 5), (4, 3)}$: ogni condotta ha un verso. Il costo della condotta $(i, j)$ è proporzionale all'acqua che ci passa: $c_(i j)$ per ogni m³/h. Si vuole decidere quali condotte costruire e quanto grandi, per portare tutto al depuratore al costo minimo. È un problema di *disegno di rete*.
+
+#let fogn = (("1"): (0, 3.6), ("5"): (4.4, 3.6), ("2"): (0, 1.2), ("3"): (4.4, 1.2), ("4"): (2.6, -0.4))
+#let fogna = (("1", "5"), ("2", "1"), ("2", "3"), ("2", "5"), ("3", "5"), ("4", "3"))
+#let fognc = ("1-5": 6, "2-1": 3, "2-3": 7, "2-5": 12, "3-5": 3, "4-3": 2)
+#let prod = (("1"): 1, ("2"): 1, ("3"): 1, ("4"): 0.5)
+#let dec(x) = str(x)
+#let fognnote = (("1"): ((-1.25, 0), [produce 1]), ("2"): ((-1.25, 0), [produce 1]), ("3"): ((1.25, 0), [produce 1]), ("4"): ((-1.45, 0), [produce 0,5]), ("5"): ((1.35, 0), [depuratore]))
+#let fognsol = ("2-1": 1, "1-5": 2, "4-3": 0.5, "3-5": 1.5)
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  rete(fogn, fogna, colori: ("5": rgb("#fff3c4")), note: fognnote,
+    etichette: fognc.pairs().map(((k, c)) => (k, $c = #c$)).to-dict()),
+  [
+    *Variabili*: $x_(i j)$ = flusso (m³/h) sulla condotta $(i, j) in A$. È continua. Se $x_(i j) = 0$ la condotta non si costruisce; se è positiva si costruisce, e il valore è anche la sua *dimensione*.
+
+    *Funzione obiettivo*: ogni condotta costa $c_(i j)$ per ogni unità di flusso,
+    $ min sum_((i, j) in A) c_(i j) x_(i j) $
+    cioè $min #(fogna.map(((a, b)) => $#fognc.at(a + "-" + b) x_(#a #b)$).join($+$))$.
+  ])
+
+*Vincoli*. Senza vincoli il minimo sarebbe tutto a 0: niente condotte, costo zero. Bisogna dire dove va l'acqua. La regola è la *conservazione del flusso*: in ogni nodo l'acqua non si crea e non sparisce, quindi *tutto quello che entra è uguale a tutto quello che esce*. Quello che il quartiere produce conta come acqua che entra nel nodo.
+
+#align(center, table(columns: 4, align: (center, right, center, left), inset: 6pt,
+  [nodo], [entra], [], [esce],
+  ..("1", "2", "3", "4").map(n => {
+    let e = fogna.filter(((a, b)) => b == n).map(((a, b)) => $x_(#a #b)$)
+    let u = fogna.filter(((a, b)) => a == n).map(((a, b)) => $x_(#a #b)$)
+    ([#n], $#((e + ($#dec(prod.at(n))$,)).join($+$))$, $=$, $#(u.join($+$))$)
+  }).flatten(),
+  [5], $#(fogna.filter(((a, b)) => b == "5").map(((a, b)) => $x_(#a #b)$).join($+$))$, $=$, $1 + 1 + 1 + 0.5 = 3.5$,
+))
+
+Il nodo 4 non ha scelta: il suo 0,5 va tutto sulla condotta $(4, 3)$. Il nodo 2 invece ha tre strade e deve dividere la sua unità fra $x_(2 1)$, $x_(2 3)$ e $x_(2 5)$: è lì che il modello decide. Nel nodo 5 quello che "esce" è l'acqua che il depuratore assorbe: tutta quella prodotta, 3.5. Questo vincolo è *ridondante*: si ottiene sommando gli altri quattro.
+
+#base[una soluzione di esempio][
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  rete(fogn, fogna, colori: ("5": rgb("#fff3c4")), evid: fognsol.keys(),
+    etichette: fogna.map(((a, b)) => (a + "-" + b, $x = #dec(fognsol.at(a + "-" + b, default: 0))$)).to-dict()),
+  [
+    Per vedere i vincoli all'opera, una soluzione che li rispetta tutti. In blu le condotte con flusso positivo: sono quelle da costruire; le grigie hanno $x = 0$ e non si costruiscono.
+
+    Controllo sul nodo 1: entra $x_(2 1) + 1 = 2$, esce $x_(1 5) = 2$. Sul nodo 3: entra $x_(2 3) + x_(4 3) + 1 = 0 + 0.5 + 1$, esce $x_(3 5) = 1.5$.
+
+    Costo: $#(fognsol.pairs().map(((k, x)) => $#fognc.at(k) dot #dec(x)$).join($+$)) = #dec(fognsol.pairs().map(((k, x)) => fognc.at(k) * x).sum())$.
+  ])
+]
+
+Per scrivere questi vincoli in forma generale si dà un nome alla quantità che ogni nodo produce o richiede: il *deficit* $b_i$, cioè quanto *manca* al nodo $i$. Per ragioni storiche si ragiona "al contrario": un nodo che produce ha deficit *negativo*.
+
+#align(center, table(columns: 3, align: (center, left, left),
+  [deficit], [il nodo è…], [nelle fognature],
+  $b_i < 0$, [una *sorgente*: offre $|b_i|$ unità di flusso], [i quartieri: $b_1 = b_2 = b_3 = -1$, $b_4 = -0.5$],
+  $b_i > 0$, [un *pozzo*: richiede $b_i$ unità di flusso], [il depuratore: $b_5 = 3.5$],
+  $b_i = 0$, [un *nodo di transito*: il flusso ci passa e basta], [nessuno (sarebbe un incrocio di tubi)],
+))
+
+Portando tutte le variabili a sinistra, "entra = esce" diventa *entra − esce = deficit*. Sono i *vincoli di conservazione del flusso* (o di bilancio), uno per nodo:
+$ sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad forall i in V $
+La prima somma è sugli archi che *entrano* in $i$, la seconda su quelli che *escono*. Per il nodo 1: $x_(2 1) - x_(1 5) = -1$, che è $x_(2 1) + 1 = x_(1 5)$ di prima.
+
+Tutto quello che le sorgenti offrono deve essere assorbito dai pozzi, quindi i deficit sommati fanno zero: $sum_i b_i = 0$. Il deficit del depuratore non è un dato in più: $b_5 = -(b_1 + b_2 + b_3 + b_4) = 3.5$.
