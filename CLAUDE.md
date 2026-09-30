@@ -23,8 +23,6 @@ Pagine = pagine del PDF. Dalla p. 5 il numero stampato sulla slide è PDF + 1 (l
 
 v4 (24 set 2026) rispetto alla v3: tolta la slide doppia della fonderia, riformulati i vincoli 5, 6 e 10 delle relazioni logiche, corretto "j ∈ A" nell'assegnamento, aggiunto "(2ⁿ − 2)" al numero di vincoli dell'MST. Modelli invariati.
 
-Refusi nelle slide v4, corretti in dispensa: p. 49 "4z − x1 + x2 + … ≤ 0" (devono essere tutti meno: 4z − Σx_c ≤ 0); p. 50-51 "M_b" = M_a e "y_V" = y_O; p. 63 obiettivo "3x12 … 12x43" = 3x21 e 2x43 (c43 = 2, l'arco è (2,1)); p. 65 "b5 = Σ b_i" = −Σ b_i = 3,5; p. 43 (riempimento) scrive "min" con il vincolo ≤ 1 (così l'ottimo è tutto a 0; di solito il riempimento è un max): in dispensa c'è solo il vincolo. Inoltre p. 17 "x_D ≥ x_A + x_B + x_D − 2" deve essere x_C al posto dell'ultimo x_D.
-
 Il grezzo del 22 set contiene una "formulazione equivalente" dell'MST (vincoli ≤ |S| − 1) che il prof **non** ha fatto (verificato sulla registrazione): non va in dispensa. In aula si è discusso invece Σ x = n − 1 (non basta da solo, ridondante con i tagli).
 
 Detto solo a voce (22 set), in dispensa: niente <, >, ≠, |x|, min/max, prodotti di variabili; "s.t." = subject to; modelli diversi per lo stesso problema vanno bene, l'efficienza non conta nel corso; forma aggregata 2x_C ≤ x_A + x_B; trappola x_C ≥ x_A + x_B per lo xor.
