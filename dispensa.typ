@@ -198,9 +198,9 @@ Perché conta: se funzione obiettivo e vincoli sono lineari, il problema è di *
 - solo $<=$, $>=$ e $=$: niente disuguaglianze strette ($<$, $>$) e niente $!=$ ("$x != y$" non si può scrivere);
 - niente prodotti o divisioni fra variabili, niente valore assoluto $|x|$, niente $min$ o $max$ di variabili dentro i vincoli: solo espressioni lineari.
 
-"s.t." sotto la funzione obiettivo sta per _subject to_, "soggetto a": da lì in poi ci sono i vincoli. Ricordarsi sempre di scrivere anche il *dominio* delle variabili ($x >= 0$, $x in {0, 1}$…).
+"s.t." sotto la funzione obiettivo sta per _subject to_, "soggetto a": da lì in poi ci sono i vincoli. Ricordarsi sempre di scrivere anche il *dominio* delle variabili, cioè i valori che possono assumere ($x >= 0$, $x in {0, 1}$…).
 
-Lo stesso problema si può scrivere con *modelli diversi*, alcuni più efficienti di altri. In questo corso l'efficienza non conta: un modello che funziona è accettabile, anche con qualche vincolo in più non necessario.]
+Lo stesso problema si può scrivere con *modelli diversi*: nel corso l'efficienza non conta, basta che il modello funzioni (anche con qualche vincolo in più).]
 
 == Il problema della fonderia (mix di produzione)
 
@@ -318,7 +318,7 @@ $
 x_i = cases(1 "se finanzio il progetto" i, 0 "altrimenti") \
 max z = sum_(i=1)^n w_i x_i \
 "s.t." sum_(i=1)^n c_i x_i <= B \
-x_i in {0, 1} quad forall i in I
+x_i in {0, 1} quad forall i = 1, dots, n
 $,
 [
   Le variabili *binarie* (o booleane) servono per le decisioni sì/no.
@@ -350,7 +350,7 @@ tv(("A", "B"),
   *Negazione*: B = non A si scrive $x_B = 1 - x_A$ (è il caso 1).
 ]))
 
-#block(sticky: true)[*Implicazione*: se finanzio A, allora devo finanziare anche C.]
+#block(sticky: true)[*Implicazione*.]
 
 #block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 tv(("A", "C"), ($x_A <= x_C$, b => b.at(0) <= b.at(1))),
@@ -380,7 +380,7 @@ tv(("A", "B", "C"),
   Con tre progetti: "se finanzio A, B e C devo finanziare D" è $x_D >= x_A + x_B + x_C - 2$. In generale con $k$ progetti il $-1$ diventa $-(k - 1)$.
 ]))
 
-#nota[I due vincoli del 6 si possono sommare in uno solo: $2 x_C <= x_A + x_B$, cioè $x_C <= (x_A + x_B) / 2$. Se almeno uno fra A e B vale 0, a destra c'è al massimo $1/2$, e una variabile binaria $<= 1/2$ può solo valere 0. Stessa cosa per il 7 più avanti: $2 x_C >= x_A + x_B$. Per l'esame le due scritture valgono uguale; in pratica i vincoli separati sono in genere più forti.]
+#nota[I due vincoli del 6 si possono sommare in uno solo: $2 x_C <= x_A + x_B$, cioè $x_C <= (x_A + x_B) / 2$. Se almeno uno fra A e B vale 0, a destra c'è al massimo $1/2$, e una variabile binaria $<= 1/2$ può solo valere 0. Stessa cosa per il 7 più avanti: $2 x_C >= x_A + x_B$. Per l'esame le due scritture valgono uguale.]
 
 #block(sticky: true)[*Or*: si vuole $C = A or B$.]
 
@@ -412,13 +412,13 @@ tv(("A", "B", "C"),
   Insieme danno $C = A xor B$.
 ]))
 
-#nota[Trappola sul 9: viene da scrivere $x_C >= x_A + x_B$. Ma con A e B entrambi finanziati diventa $x_C >= 2$, che una binaria non può rispettare: il problema diventa *inammissibile* (nessuna soluzione rispetta tutti i vincoli). Il testo del 9 dice solo quando C è obbligatorio; con A e B entrambi a 1 non dice niente, quindi C deve restare libero.]
+#nota[Trappola sul 9: $x_C >= x_A + x_B$ è sbagliato. Con A e B entrambi finanziati chiede $x_C >= 2$, impossibile per una binaria: il problema diventa *inammissibile* (nessuna soluzione rispetta tutti i vincoli). In quel caso invece C deve restare libero.]
 
 #nota[Schema che si ripete: il "*devo*" (se … allora C) è un vincolo $x_C >= dots$ che spinge C a 1; il "*posso solo se*" è un vincolo $x_C <= dots$ che tiene C a 0.]
 
 == Scegliere lati di un grafo: albero di copertura e commesso viaggiatore
 
-Nello zaino le variabili binarie sceglievano un *sottoinsieme* dei progetti. È il loro uso generale: le variabili binarie selezionano sottoinsiemi di un insieme dato e, con i vincoli giusti, il sottoinsieme scelto può avere una struttura complessa quanto si vuole. Qui l'insieme è quello dei *lati di un grafo*, e la struttura richiesta è prima un albero, poi un ciclo.
+Nello zaino le variabili binarie sceglievano un *sottoinsieme* dei progetti. Qui scelgono un sottoinsieme dei *lati di un grafo*, e i vincoli gli impongono una forma: prima un albero, poi un ciclo.
 
 #base[grafi][
 Un *grafo non orientato* $G = (V, E)$ è un insieme di *vertici* $V$ (i pallini) e di *lati* $E$ (le linee). Un lato unisce due vertici e si scrive ${i, j}$: le graffe dicono che l'ordine non conta, ${i, j}$ e ${j, i}$ sono lo stesso lato. Con $n = |V|$ si indica il numero di vertici ($|dot|$ = numero di elementi di un insieme). Nei grafi *orientati* le linee hanno un verso e si chiamano *archi*, $(i, j)$; qui sono non orientati e si chiamano *lati* (se il prof dice "arco", qui leggi "lato").
@@ -455,13 +455,13 @@ Un *grafo non orientato* $G = (V, E)$ è un insieme di *vertici* $V$ (i pallini)
   [
     *Variabili*: una per lato,
     $ x_(i j) = cases(1 "se costruisco il collegamento" {i, j} in E, 0 "altrimenti") $
-    Scegliere i valori delle $x$ vuol dire scegliere un insieme di lati. Si potrebbe anche usare una variabile per ogni albero possibile, ma gli alberi sono un numero esponenziale: meglio costruire la soluzione *a pezzettini*, un lato alla volta. Nel disegno i lati in blu hanno $x_(i j) = 1$: collegano tutte le città con costo $1 + 4 + 3 + 2 = 10$, il minimo possibile per questo grafo.
+    Si potrebbe usare una variabile per ogni albero possibile, ma gli alberi sono un numero esponenziale: meglio costruire la soluzione *a pezzettini*, un lato alla volta. Nel disegno i lati in blu hanno $x_(i j) = 1$: costo $1 + 4 + 3 + 2 = 10$, il minimo per questo grafo.
   ])
 
 *Funzione obiettivo*: come nello zaino, nella somma entrano solo i lati scelti,
 $ min z = sum_({i, j} in E) c_(i j) x_(i j) $
 
-*Vincoli*: come si scrive "la rete è connessa"? Si guarda il problema da fuori. Se la rete è connessa, qualunque gruppo di città $S$ prenda, almeno un lato scelto deve *uscire* da $S$, sennò le città di $S$ restano isolate dal resto. Questo vale per ogni $S$ che non sia vuoto e non sia tutto $V$ (se $S = V$ non c'è nessun "resto" da raggiungere). Si scrive $S subset V$, sottoinsieme *proprio* cioè diverso da $V$, e $S != emptyset$:
+*Vincoli*: come si scrive "la rete è connessa"? Qualunque gruppo di città $S$ prenda, almeno un lato scelto deve *uscire* da $S$, sennò le città di $S$ restano isolate. Vale per ogni $S$ non vuoto e diverso da tutto $V$ (con $S = V$ non c'è un "fuori"): si scrive $S subset V$ (sottoinsieme *proprio*) e $S != emptyset$:
 
 $ sum_(i in S, j in V without S) x_(i j) >= 1 quad forall S subset V, S != emptyset quad quad x_(i j) in {0, 1} quad forall {i, j} in E $
 
@@ -479,9 +479,9 @@ La somma conta i lati scelti che attraversano il taglio: deve essere almeno 1.
 
 #nota[Il *numero di vincoli è esponenziale*: uno per ogni sottoinsieme $S$. I sottoinsiemi di $n$ vertici sono $2^n$; tolti $emptyset$ e $V$ restano $2^n - 2$ vincoli. Con 30 città sono già più di un miliardo.]
 
-Il modello chiede solo che la rete sia *connessa*, non che sia un albero. Ma all'ottimo è per forza un albero: se i lati scelti formassero un ciclo, togliendo un lato del ciclo la rete resterebbe connessa (le città si raggiungono dall'altra parte del ciclo) e costerebbe meno, perché ogni $c_(i j) > 0$. Quindi una soluzione con un ciclo non può essere ottima.
+Il modello chiede solo che la rete sia *connessa*, non che sia un albero. Ma all'ottimo lo è per forza: se i lati scelti formassero un ciclo, togliendone uno la rete resterebbe connessa e costerebbe meno, perché ogni $c_(i j) > 0$.
 
-Un'altra idea: un albero su $n$ vertici ha sempre $n - 1$ lati, quindi si potrebbe scrivere $sum_({i, j} in E) x_(i j) = n - 1$. *Da solo non basta*: $n - 1$ lati possono chiudere un ciclo e lasciare fuori un vertice (è proprio il triangolo di prima: 3 lati, $n - 1 = 3$, ma il 4 è isolato). *Insieme ai vincoli di taglio è ridondante*: non serve, perché con costi positivi l'ottimo è già un albero. Diventerebbe necessario se i costi potessero essere negativi: allora al modello converrebbe prendere lati in più, e bisognerebbe fermarlo a $n - 1$.
+Un'altra idea: un albero su $n$ vertici ha sempre $n - 1$ lati, quindi si potrebbe scrivere $sum_({i, j} in E) x_(i j) = n - 1$. *Da solo non basta*: $n - 1$ lati possono chiudere un ciclo e lasciare fuori un vertice (è il triangolo di prima: 3 lati, $n - 1 = 3$, ma il 4 è isolato). *Insieme ai vincoli di taglio è ridondante*: con costi positivi l'ottimo è già un albero. Servirebbe solo con costi negativi, perché allora al modello converrebbe prendere lati in più.
 
 *Problema del commesso viaggiatore* (Travelling Salesman Problem, TSP). Il grafo $G = (V, E)$ è *completo* e non orientato: $V = {1, dots, n}$ sono città, $E = {{i, j} : i, j in V, i != j}$ contiene tutti i collegamenti possibili, ognuno con costo $c_(i j) >= 0$. Si cerca un *ciclo hamiltoniano di costo minimo*: parto da una città, visito ciascuna delle altre *una e una sola volta*, torno alla città di partenza, e il giro costa il meno possibile.
 
@@ -497,7 +497,7 @@ Senza vincoli il $min$ non sceglierebbe nessun lato (costo 0). Prima idea: in un
     4 lati su 4 vertici, e il grafo è anche connesso, ma non è un giro: il vertice 3 tocca *tre* lati scelti, il 4 uno solo.
   ])
 
-Nel giro invece in ogni città *entro una volta ed esco una volta*: ogni vertice tocca esattamente *due* lati scelti. Fissato il vertice $i$, sommo le $x$ dei lati che lo toccano:
+Nel giro invece in ogni città *entro una volta ed esco una volta*: ogni vertice tocca esattamente *due* lati scelti (ha *grado* 2). Fissato il vertice $i$, sommo le $x$ dei lati che lo toccano:
 $ sum_(j : {i, j} in E) x_(i j) = 2 quad forall i in V $
 
 Questo però non basta. I lati in blu qui sotto danno a ogni vertice esattamente due lati, eppure non sono *un* giro ma *due* cicli separati (sottocicli):
@@ -521,7 +521,7 @@ min z = & sum_({i, j} in E) c_(i j) x_(i j) &&&& #text(9pt)[← costo del giro] 
 & x_(i j) in {0, 1} quad && forall {i, j} in E
 $
 
-Il vincolo $sum x_(i j) = n$ ora è *ridondante*: se ogni vertice tocca 2 lati, sommando su tutti i vertici conto $2n$, e ogni lato l'ho contato due volte (una per estremo), quindi i lati sono $n$. Nella somma sui lati invece ${i, j}$ compare una volta sola: il lato non ha verso, ${i, j}$ e ${j, i}$ sono lo stesso.
+Il vincolo $sum x_(i j) = n$ ora è *ridondante*: se ogni vertice tocca 2 lati, sommando su tutti i vertici conto $2n$, e ogni lato l'ho contato due volte (una per estremo), quindi i lati sono $n$.
 
 #nota[È il modello dell'albero di copertura più i vincoli di grado 2. Non è l'unico modello del TSP: si può usare una variabile per ogni ciclo hamiltoniano (ma sono un numero esponenziale e bisogna generarli tutti), oppure sostituire i vincoli di taglio con vincoli che vietano direttamente i sottocicli.]
 
@@ -535,7 +535,7 @@ Un'azienda deve assegnare delle attività a dei lavoratori. Lavoratori $L$ e att
     scelti: (("1", "b"), ("2", "a"), ("3", "c")),
     extra: (draw.content((0, 3.2), text(8pt)[$L$]), draw.content((2.6, 3.2), text(8pt)[$A$]))),
   [
-    Si può vedere come una scelta di lati sul grafo *bipartito* $G = (L union A, E)$: a sinistra i lavoratori, a destra le attività, un lato per ogni coppia possibile. Non tutti sanno fare tutto (il lavoratore 1 non sa fare c): l'importante è che un assegnamento completo esista.
+    Si può vedere come una scelta di lati sul grafo *bipartito* $G = (L union A, E)$: a sinistra i lavoratori, a destra le attività, un lato per ogni coppia (nel disegno solo alcuni).
 
     Un assegnamento è un insieme di lati in cui ogni vertice, di qualunque lato, tocca *esattamente un* lato scelto (in blu: 1 fa b, 2 fa a, 3 fa c).
   ])
@@ -552,12 +552,12 @@ $
 Ogni riga è il vincolo "esattamente uno fra…" delle relazioni logiche ($x_A + x_B = 1$). Servono *tutte e due*: con solo "ogni attività ha un lavoratore" potrei dare due attività allo stesso lavoratore e lasciarne un altro senza niente; con solo l'altra, due lavoratori potrebbero fare la stessa attività. Insieme si chiamano *vincoli di assegnamento*. L'assegnamento è un *problema polinomiale*.
 
 #base[problema polinomiale][
-Un problema è *polinomiale* se esiste un algoritmo che lo risolve in un tempo che cresce come una potenza della dimensione ($n^2$, $n^3$, …) e non come $2^n$. In pratica: si risolve in fretta anche quando $n$ è grande. Non è ovvio guardando il modello: il modello elenca i vincoli, l'algoritmo è un'altra cosa.
+Un problema è *polinomiale* se esiste un algoritmo che lo risolve in un tempo che cresce come una potenza della dimensione ($n^2$, $n^3$, …) e non come $2^n$. In pratica: si risolve in fretta anche quando $n$ è grande.
 ]
 
 Gli stessi vincoli tornano nel commesso viaggiatore su un grafo *orientato*, dove il lato $(i, j)$ va da $i$ a $j$ e non è lo stesso di $(j, i)$. Il "grado 2" si spezza in due vincoli simili a quelli dell'assegnamento: da ogni città *esco* una volta, $sum_j x_(i j) = 1$, e in ogni città *entro* una volta, $sum_i x_(i j) = 1$.
 
-Nell'assegnamento il vincolo "esattamente uno" vale *dai due lati*: ogni lavoratore ha un'attività e ogni attività ha un lavoratore. Se vale da *un lato solo* si parla di *vincoli di semi-assegnamento*: ogni elemento del primo insieme riceve esattamente un elemento del secondo, ma un elemento del secondo può essere dato a molti (o a nessuno).
+Nell'assegnamento "esattamente uno" vale *dai due lati*. Se vale da *un lato solo* si parla di *vincoli di semi-assegnamento*: ogni elemento del primo insieme riceve esattamente un elemento del secondo, ma un elemento del secondo può essere dato a molti (o a nessuno).
 
 *Assegnamento di frequenze*. Una compagnia telefonica copre la città con un insieme di antenne $S = {1, dots, n}$, tutte attive. A ogni antenna va assegnata una frequenza fra quelle disponibili $F = {f_1, dots, f_m}$. Due antenne troppo vicine non possono avere la stessa frequenza, altrimenti interferiscono. Ogni frequenza ha un costo (lo stesso per tutte), quindi si vuole coprire la città usando il *minor numero di frequenze*.
 
@@ -589,15 +589,13 @@ $
 Ogni vincolo è una relazione logica già vista:
 - $sum_f x_(i f) = 1$ è "*esattamente uno*": il semi-assegnamento (per ogni antenna, non per ogni frequenza);
 - $x_(i f) + x_(j f) <= 1$ è "*al massimo uno*": fra due antenne vicine $i$ e $j$ al massimo una usa $f$. Si scrive per ogni lato del grafo di incompatibilità e per ogni frequenza.
-- $y_f >= x_(i f)$ è il *legame* fra le due famiglie di variabili. È l'implicazione "se assegno $f$ all'antenna $i$, allora $f$ è usata" ($x_(i f) <= y_f$). Se $x_(i f) = 1$ il vincolo forza $y_f = 1$. Se nessuna antenna usa $f$ il vincolo dice solo $y_f >= 0$ e $y_f$ sarebbe libera: ma la funzione obiettivo è un $min$, quindi $y_f$ va a 0 da sola.
-
-La funzione obiettivo conta le frequenze usate: $y$ è un "vettorino" di 0 e 1 lungo $|F|$, e la sua somma è il numero di 1.
+- $y_f >= x_(i f)$ è il *legame* fra le due famiglie di variabili: l'implicazione "se assegno $f$ all'antenna $i$, allora $f$ è usata" ($x_(i f) <= y_f$). Se nessuna antenna usa $f$, $y_f$ sarebbe libera, ma il $min$ la porta a 0.
 
 Senza quest'ultimo vincolo il modello sarebbe sbagliato: niente lega le $y$ alle $x$, quindi il $min$ metterebbe tutte le $y_f$ a 0 (costo 0) mentre le antenne usano comunque le frequenze.
 
-#nota[Ogni volta che un modello ha *due o più famiglie di variabili* serve un vincolo che le leghi. Il significato che do a una variabile quando la definisco a parole ("$y_f$ vale 1 se uso la frequenza") è come un commento nel codice: il solutore non lo legge. Quel significato deve essere imposto dai vincoli.]
+#nota[Ogni volta che un modello ha *due o più famiglie di variabili* serve un vincolo che le leghi. Il significato che do a una variabile quando la definisco a parole ("$y_f$ vale 1 se uso la frequenza") è come un commento nel codice: il solutore (il programma che risolve il modello) non lo legge. Quel significato deve essere imposto dai vincoli.]
 
-Questo modello è la formulazione di un problema classico, la *colorazione di un grafo* (graph coloring): dare un colore a ogni vertice, usando il minor numero di colori, in modo che due vertici uniti da un lato abbiano colori diversi. Lo stesso modello risolve problemi che sembrano non avere niente in comune con le antenne, come il prossimo.
+Questo modello è la *colorazione di un grafo* (graph coloring): dare un colore a ogni vertice, con il minor numero di colori, in modo che due vertici uniti da un lato abbiano colori diversi. Lo stesso modello risolve anche il prossimo problema.
 
 *Moli e barche (ordinamento di lavori su macchine)*. Un porto ha un insieme di moli $M = {1, dots, k}$, tutti uguali. Ogni giorno arrivano $n$ barche, $B = {1, dots, n}$. La barca $i$ arriva all'istante $t_i >= 0$ e occupa il molo per una durata $d_i$ per scaricare, quindi riparte a $t_i + d_i$. Le barche non possono aspettare: vanno servite appena arrivano. Ogni barca va assegnata a *esattamente un molo*, e due barche non possono stare sullo stesso molo in intervalli di tempo che si sovrappongono. Si vuole usare il *minor numero di moli*.
 
@@ -609,7 +607,7 @@ Questo modello è la formulazione di un problema classico, la *colorazione di un
     La 1 e la 2 si sovrappongono (quando arriva la 2, la 1 è ancora al molo): non possono condividere un molo. La 3 arriva quando le altre due sono già ripartite: può usare il molo di una delle due. Bastano 2 moli.
   ])
 
-Viene da pensare a una variabile per ogni molo e per ogni istante di tempo ("il molo $m$ è occupato all'istante $t$"). Non conviene: gli istanti sono infiniti, e per usarli bisognerebbe spezzare il tempo in intervallini (*discretizzare*). Ma soprattutto *il tempo qui non è una decisione*: arrivo e durata sono dati, la barca $i$ occupa il molo da $t_i$ a $t_i + d_i$ qualunque cosa io scelga. Una variabile serve per ciò che devo decidere; ciò che so già è un dato. (Se potessi scegliere *quando* servire una barca, allora sì, servirebbe una variabile per il tempo.)
+Viene da pensare a una variabile per ogni molo e ogni istante ("il molo $m$ è occupato all'istante $t$"). Non serve: *il tempo qui non è una decisione*. Arrivo e durata sono dati, e una variabile serve solo per ciò che devo decidere (servirebbe se potessi scegliere *quando* servire una barca). In più gli istanti sono infiniti: bisognerebbe spezzare il tempo in intervallini (*discretizzare*).
 
 Il tempo si usa *prima* di scrivere il modello, sui dati, per costruire il *grafo di incompatibilità* $G = (B, E)$: i vertici sono le barche, e c'è un lato fra due barche quando i loro intervalli hanno almeno un istante in comune,
 $ {i, j} in E quad "se" quad [t_i, t_i + d_i] ∩ [t_j, t_j + d_j] != emptyset $
@@ -636,13 +634,13 @@ $
   [lato = incompatibili], [troppo vicine], [intervalli sovrapposti], [lavori nello stesso momento],
 ))
 
-Per questo il problema si chiama in generale *ordinamento di lavori su macchine*: le macchine sono i moli, i lavori sono le barche. Avevamo visto che lo stesso problema si può scrivere con modelli diversi; qui succede il contrario, *lo stesso modello risolve problemi diversi*.
+Prima lo stesso problema aveva modelli diversi; qui succede il contrario: *lo stesso modello risolve problemi diversi*.
 
 == Selezione di sottoinsiemi: partizione, copertura, riempimento
 
 Nel modello dei moli la soluzione è costruita a pezzettini: una variabile per ogni coppia barca-molo. Niente vieta di usare *pezzi più grandi*. Invece di decidere barca per barca, elenco tutti i *turni* possibili di un molo (cioè tutti i gruppi di barche che un molo può servire in una giornata senza sovrapposizioni) e uso una variabile per ogni turno: lo scelgo oppure no.
 
-Sia $cal(F)$ la famiglia di tutti i sottoinsiemi $S subset.eq B$ di barche che *non si sovrappongono fra loro*, e che quindi possono stare tutte sullo stesso molo. Ogni $S in cal(F)$ è un possibile turno (o schedulazione) di un molo. $cal(F)$ è un "insieme di insiemi". Con le tre barche dell'esempio i turni possibili sono #turni.len():
+Sia $cal(F)$ la famiglia (un "insieme di insiemi") di tutti i sottoinsiemi non vuoti $S subset.eq B$ di barche che *non si sovrappongono fra loro*: ogni $S in cal(F)$ è un possibile turno (o schedulazione) di un molo. Con le tre barche dell'esempio i turni possibili sono #turni.len():
 
 #grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
   tempi(turni, etichette: turni.enumerate().map(((k, s)) => $S_#(k + 1)$)),
@@ -690,9 +688,9 @@ $
 min z = sum_(p in P) y_p quad "s.t." quad sum_(p in P) a_(i p) y_p = 1 quad forall i in B, quad quad y_p in {0, 1} quad forall p in P
 $
 
-#nota[*Parametro o variabile?* $a_(i p)$ è un *parametro*: un dato, come gli orari delle barche. Una volta elencati i turni so già dove vale 1 e dove 0, non c'è niente da decidere, e infatti non compare fra le variabili del modello (non gli si scrive il dominio). $x_(i m)$ nel modello di prima era una *variabile*: a quale molo va la barca lo decide il solutore.
+#nota[*Parametro o variabile?* $a_(i p)$ è un *parametro*: un dato, come gli orari delle barche. Elencati i turni so già dove vale 1 e dove 0: non c'è niente da decidere, quindi non è fra le variabili e non ha un dominio. $x_(i m)$ nel modello di prima era una *variabile*: a quale molo va la barca lo decide il solutore.
 
-Il parametro è anche più flessibile della scrittura con gli insiemi: può valere 2, 3, … per dire "quante volte", non solo "sì o no". Tornerà utile.]
+Il parametro può anche valere 2, 3, … per dire "quante volte", non solo "sì o no": tornerà utile.]
 
 I due modelli a confronto: con le $x_(i m)$ ho poche variabili (barche × moli) e molti vincoli; con i turni ho *pochissimi vincoli* (uno per barca) ma *tantissime variabili*, una per ogni gruppo compatibile, e i gruppi possono essere un numero esponenziale. Questi modelli funzionano molto bene quando le variabili si generano un po' alla volta invece che tutte insieme, ma è una tecnica che nel corso non si vede.
 
@@ -725,7 +723,7 @@ La tabella piatto-ingrediente è una matrice di 0 e 1: è di nuovo un parametro 
 
 *Variabili*. Le decisioni sono tre:
 - quali piatti fare: $x_c in {0, 1}$ per ogni piatto $c in C = {1, dots, 8}$, vale 1 se il piatto $c$ è nel menù;
-- quante casse comprare: $y_M, y_O, y_S$. Di una cassa se ne può comprare più di una, quindi non bastano variabili binarie: sono *intere*, $y in NN_0$ (i numeri naturali con lo zero: 0 non la compro, 1 ne compro una, 2 ne compro due…). È un'estensione delle binarie: dicono *se* faccio una cosa e *quante volte*;
+- quante casse comprare: $y_M, y_O, y_S$. Se ne può comprare più di una, quindi non sono binarie ma *intere*, $y in NN_0$ (0, 1, 2, …): dicono *se* compro e *quante*;
 - se prendo il bonus: $z in {0, 1}$, vale 1 se il menù ha almeno 4 piatti.
 
 *Funzione obiettivo*: il valore di ogni piatto scelto, più il bonus $b = 10$ se $z = 1$.
@@ -737,7 +735,7 @@ Con $z = 0$ dice $sum x_c >= 0$, sempre vero. Con $z = 1$ dice $sum x_c >= 4$: p
 
 E quando i piatti sono 4 o più? Il vincolo permette sia $z = 0$ sia $z = 1$. Ma $z$ ha coefficiente positivo ($+10$) in una funzione obiettivo di *massimo*: appena può, il modello la mette a 1. *Basta questo vincolo* perché la funzione obiettivo spinge dalla parte giusta.
 
-Non sempre si è così fortunati. Se $z$ non comparisse nella funzione obiettivo (o se il suo coefficiente spingesse dalla parte sbagliata), niente la obbligherebbe a valere 1 con 4 piatti o più. Per avere "$z = 1$ *se e solo se* i piatti sono almeno 4" servirebbe un secondo vincolo, che obbliga $z$ a 1:
+Se $z$ non fosse nella funzione obiettivo (o il suo coefficiente spingesse dalla parte sbagliata), niente la obbligherebbe a valere 1 con 4 piatti o più. Per avere "$z = 1$ *se e solo se* i piatti sono almeno 4" serve un secondo vincolo, che obbliga $z$ a 1:
 $ sum_(c in C) x_c <= 3 + (|C| - 3) z $
 ($|C| = 8$ è il numero di piatti.) Con $z = 0$ dice $sum x_c <= 3$: per fare 4 piatti o più devo per forza avere $z = 1$. Con $z = 1$ dice $sum x_c <= |C|$, sempre vero. La tabella mostra, per ogni numero di piatti nel menù, quali valori di $z$ lascia passare ciascun vincolo:
 
@@ -760,7 +758,7 @@ Se faccio i piatti 5 e 6, tutti e due con il filetto, il primo vincolo dà $y_M 
 
 Scrivere cinque vincoli a mano va bene qui, ma non con cento ingredienti. La stessa cosa si scrive in forma generale in due modi. Con gli *insiemi*: chiamo $H = {M_f, M_a, O_i, O_r, S}$ gli ingredienti e $C_h$ l'insieme dei piatti che usano l'ingrediente $h$; per il filetto, $sum_(c in C_(M_f)) x_c <= y_M$. Oppure con il *parametro binario* $a_(h c)$, che vale 1 se il piatto $c$ usa l'ingrediente $h$ (è la tabella dei piatti): $sum_(c in C) a_(M_f, c) x_c <= y_M$. La somma è su tutti i piatti, e quelli che non usano il filetto spariscono perché moltiplicati per 0.
 
-Il parametro permette di arrivare a *un solo vincolo per tutti gli ingredienti*. Chiamo $J = {M, O, S}$ i tipi di cassa e aggiungo un secondo parametro, $d_(h j) = 1$ se l'ingrediente $h$ sta nella cassa $j$:
+Il parametro permette di arrivare a *una sola formula per tutti gli ingredienti*. Chiamo $J = {M, O, S}$ i tipi di cassa e aggiungo un secondo parametro, $d_(h j) = 1$ se l'ingrediente $h$ sta nella cassa $j$ (0 altrimenti):
 $ underbrace(sum_(c in C) a_(h c) x_c, "quanto ne serve") <= underbrace(sum_(j in J) d_(h j) y_j, "quanto ne compro") quad forall h in H $
 
 #nota[Questa forma regge anche casi che le altre non reggono, cambiando solo i numeri nei parametri: un piatto che usa *due* porzioni dello stesso ingrediente ($a_(h c) = 2$), una cassa che contiene *più unità* di un ingrediente ($d_(h j) = 2$), lo stesso ingrediente presente in *casse diverse* (più $d_(h j)$ a 1 sulla stessa riga). All'esame va bene anche la forma lunga.]
@@ -801,7 +799,7 @@ L'insieme di tutti i cammini è $P = P_1 union P_2 union P_3 union P_4$. Da qui 
 - nulla vieta $i_1 = i_2$ (o $e_1 = e_2$): lo stesso camion porta *due container allo stesso cliente*, e il tratto fra le due "fermate" costa 0. Per questo il parametro che dice se un cammino passa da un cliente non è binario: $a_(p i)$ = numero di volte (0, 1 o 2) che il cammino $p$ visita l'importatore $i$, e $a_(p e)$ lo stesso per l'esportatore $e$. Ecco il caso in cui il parametro vale 2;
 - se un cliente è sia importatore sia esportatore, lo si tratta come due punti diversi a distanza 0.
 
-*Variabili*: $y_p$ = numero di camion che fanno il cammino $p in P$. È intera e non binaria perché lo stesso giro può servire più volte (un importatore che aspetta 6 container riceve più camion).
+*Variabili*: $y_p$ = numero di volte che viene fatto il cammino $p in P$. È intera e non binaria perché lo stesso giro può servire più volte (un importatore che aspetta 6 container riceve più camion).
 
 $
 min & sum_(p in P) c_p y_p &&&& #text(9pt)[← distanza totale] \
@@ -812,15 +810,15 @@ $
 
 I vincoli hanno la forma della partizione, con $q_i$ al posto di 1: sommo i cammini che passano da $i$, ciascuno contato quanti container gli lascia, e il totale deve essere la sua domanda. La capacità del camion e l'ordine consegna-ritiro *non compaiono nel modello*: sono già dentro la costruzione di $P$, come l'incompatibilità delle barche era dentro $cal(F)$.
 
-#nota[Tutta la difficoltà sta nel generare i cammini; il modello poi è semplice. Qui si può fare perché i cammini hanno al più 4 fermate. Se i camion potessero fare giri lunghi i cammini sarebbero un numero enorme (cresce come il fattoriale, $n! = n dot (n - 1) dots 2 dot 1$, il numero di modi di mettere in ordine $n$ fermate): esistono algoritmi che li generano solo quando servono (generazione di colonne), ma nel corso non si vedono.]
+#nota[Tutta la difficoltà sta nel generare i cammini; il modello poi è semplice. Qui si può fare perché i cammini hanno al più 4 fermate: con giri lunghi sarebbero troppi, e si generano solo quando servono (generazione di colonne, non si fa nel corso).]
 
 == Problemi di flusso su rete
 
-Finora le variabili erano *binarie* (faccio / non faccio) o *intere* (quante volte lo faccio). Anche una variabile *continua*, cioè un numero reale qualunque, può portare un'informazione logica: se vale 0 quella scelta non viene fatta, se è positiva la scelta è fatta e il valore dice *quanto*. Una sola variabile fa da interruttore e da quantità.
+Le variabili *binarie* dicono se faccio una cosa, le *intere* quante volte. Anche una variabile *continua* (un numero reale) può dire sì o no: se vale 0 la scelta non è fatta, se è positiva è fatta e il valore dice *quanto*.
 
-Questa idea si usa soprattutto nei *problemi di flusso su rete*. Una rete è un grafo orientato: qualcosa (merce, energia, dati, acqua, gas) si muove lungo gli archi, e le variabili dicono *quanto* ne passa su ogni arco. Di conseguenza dicono anche quali archi vengono usati davvero.
+Si usa nei *problemi di flusso su rete*. Una rete è un grafo orientato: qualcosa (merce, energia, dati, acqua, gas) si muove lungo gli archi, e le variabili dicono *quanto* ne passa su ogni arco, quindi anche quali archi si usano.
 
-*Il problema delle fognature*. Una città ha 4 quartieri, i vertici $V = {1, 2, 3, 4}$. Ogni quartiere produce una quantità nota di acque reflue, in m³/h: 1 i quartieri 1, 2 e 3, e 0,5 il quartiere 4. Tutta l'acqua va portata a un unico depuratore, il nodo 5. Le condotte che si possono costruire sono gli archi $A = {(1, 5), (2, 1), (2, 3), (2, 5), (3, 5), (4, 3)}$: ogni condotta ha un verso. Il costo della condotta $(i, j)$ è proporzionale all'acqua che ci passa: $c_(i j)$ per ogni m³/h. Si vuole decidere quali condotte costruire e quanto grandi, per portare tutto al depuratore al costo minimo. È un problema di *disegno di rete*.
+*Il problema delle fognature*. Una città ha 4 quartieri, i nodi 1, 2, 3 e 4. Ogni quartiere produce una quantità nota di acque reflue, in m³/h: 1 i quartieri 1, 2 e 3, e 0,5 il quartiere 4. Tutta l'acqua va portata a un unico depuratore, il nodo 5. Le condotte che si possono costruire sono gli archi $A = {(1, 5), (2, 1), (2, 3), (2, 5), (3, 5), (4, 3)}$: ogni condotta ha un verso. Il costo della condotta $(i, j)$ è proporzionale all'acqua che ci passa: $c_(i j)$ per ogni m³/h. Si vuole decidere quali condotte costruire e quanto grandi, per portare tutto al depuratore al costo minimo. È un problema di *disegno di rete*.
 
 #let fogn = (("1"): (0, 3.6), ("5"): (4.4, 3.6), ("2"): (0, 1.2), ("3"): (4.4, 1.2), ("4"): (2.6, -0.4))
 #let fogna = (("1", "5"), ("2", "1"), ("2", "3"), ("2", "5"), ("3", "5"), ("4", "3"))
@@ -828,7 +826,6 @@ Questa idea si usa soprattutto nei *problemi di flusso su rete*. Una rete è un 
 #let prod = (("1"): 1, ("2"): 1, ("3"): 1, ("4"): 0.5)
 #let dec(x) = str(x)
 #let fognnote = (("1"): ((-1.25, 0), [produce 1]), ("2"): ((-1.25, 0), [produce 1]), ("3"): ((1.25, 0), [produce 1]), ("4"): ((-1.45, 0), [produce 0,5]), ("5"): ((1.35, 0), [depuratore]))
-#let fognsol = ("2-1": 1, "1-5": 2, "4-3": 0.5, "3-5": 1.5)
 
 #grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
   rete(fogn, fogna, colori: ("5": rgb("#fff3c4")), note: fognnote,
@@ -843,7 +840,7 @@ Questa idea si usa soprattutto nei *problemi di flusso su rete*. Una rete è un 
 
 *Vincoli*. Senza vincoli il minimo sarebbe tutto a 0: niente condotte, costo zero. Bisogna dire dove va l'acqua. La regola è la *conservazione del flusso*: in ogni nodo l'acqua non si crea e non sparisce, quindi *tutto quello che entra è uguale a tutto quello che esce*. Quello che il quartiere produce conta come acqua che entra nel nodo.
 
-#align(center, table(columns: 4, align: (center, right, center, left), inset: 6pt,
+#block(breakable: false, align(center, table(columns: 4, align: (center, right, center, left), inset: 6pt,
   [nodo], [entra], [], [esce],
   ..("1", "2", "3", "4").map(n => {
     let e = fogna.filter(((a, b)) => b == n).map(((a, b)) => $x_(#a #b)$)
@@ -851,22 +848,9 @@ Questa idea si usa soprattutto nei *problemi di flusso su rete*. Una rete è un 
     ([#n], $#((e + ($#dec(prod.at(n))$,)).join($+$))$, $=$, $#(u.join($+$))$)
   }).flatten(),
   [5], $#(fogna.filter(((a, b)) => b == "5").map(((a, b)) => $x_(#a #b)$).join($+$))$, $=$, $1 + 1 + 1 + 0.5 = 3.5$,
-))
+)))
 
 Il nodo 4 non ha scelta: il suo 0,5 va tutto sulla condotta $(4, 3)$. Il nodo 2 invece ha tre strade e deve dividere la sua unità fra $x_(2 1)$, $x_(2 3)$ e $x_(2 5)$: è lì che il modello decide. Nel nodo 5 quello che "esce" è l'acqua che il depuratore assorbe: tutta quella prodotta, 3.5. Questo vincolo è *ridondante*: si ottiene sommando gli altri quattro.
-
-#base[una soluzione di esempio][
-#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
-  rete(fogn, fogna, colori: ("5": rgb("#fff3c4")), evid: fognsol.keys(),
-    etichette: fogna.map(((a, b)) => (a + "-" + b, $x = #dec(fognsol.at(a + "-" + b, default: 0))$)).to-dict()),
-  [
-    Per vedere i vincoli all'opera, una soluzione che li rispetta tutti. In blu le condotte con flusso positivo: sono quelle da costruire; le grigie hanno $x = 0$ e non si costruiscono.
-
-    Controllo sul nodo 1: entra $x_(2 1) + 1 = 2$, esce $x_(1 5) = 2$. Sul nodo 3: entra $x_(2 3) + x_(4 3) + 1 = 0 + 0.5 + 1$, esce $x_(3 5) = 1.5$.
-
-    Costo: $#(fognsol.pairs().map(((k, x)) => $#fognc.at(k) dot #dec(x)$).join($+$)) = #dec(fognsol.pairs().map(((k, x)) => fognc.at(k) * x).sum())$.
-  ])
-]
 
 Per scrivere questi vincoli in forma generale si dà un nome alla quantità che ogni nodo produce o richiede: il *deficit* $b_i$, cioè quanto *manca* al nodo $i$. Per ragioni storiche si ragiona "al contrario": un nodo che produce ha deficit *negativo*.
 
@@ -878,7 +862,7 @@ Per scrivere questi vincoli in forma generale si dà un nome alla quantità che 
 ))
 
 Portando tutte le variabili a sinistra, "entra = esce" diventa *entra − esce = deficit*. Sono i *vincoli di conservazione del flusso* (o di bilancio), uno per nodo:
-$ sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad forall i in V $
+$ sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad "per ogni nodo" i $
 La prima somma è sugli archi che *entrano* in $i$, la seconda su quelli che *escono*. Per il nodo 1: $x_(2 1) - x_(1 5) = -1$, che è $x_(2 1) + 1 = x_(1 5)$ di prima.
 
 Tutto quello che le sorgenti offrono deve essere assorbito dai pozzi, quindi i deficit sommati fanno zero: $sum_i b_i = 0$. Il deficit del depuratore non è un dato in più: $b_5 = -(b_1 + b_2 + b_3 + b_4) = 3.5$.
