@@ -163,6 +163,32 @@
   if v.len() == 2 { [0 o 1] } else if v.len() == 1 { strong[#v.at(0)] } else { no }
 }
 
+// retta dei numeri: punti = valori ammessi isolati, interv = ((a, b), ...) intervalli ammessi
+// tacca: un numero, oppure (posizione, etichetta)
+#let tk(t) = if type(t) == array { t } else { (t, [#str(t).replace(".", ",")]) }
+#let asse(max, punti: (), interv: (), tacche: (), sopra: (), scala: 1) = canvas(length: scala * 1cm, {
+  import draw: *
+  line((0, 0), (max + 0.3, 0), stroke: 0.5pt + grigio, mark: (end: "stealth", fill: grigio))
+  for (t, l) in tacche.map(tk) { line((t, -0.08), (t, 0.08), stroke: 0.5pt); content((t, -0.35), text(7pt, l)) }
+  for (a, b) in interv { line((a, 0), (b, 0), stroke: 3pt + blu) }
+  for p in punti { circle((p, 0), radius: 0.09, fill: blu, stroke: none) }
+  for (x, c) in sopra { content((x, 0.4), text(7pt, c)) }
+})
+// funzione a tratti: pezzi = ((a, b, f), ...), pieni / vuoti = punti (x, y) inclusi / esclusi
+#let atratti(pezzi, xmax, ymin, ymax, sx: 1, sy: 1, pieni: (), vuoti: (), xt: (), yt: (), xl: $x$, yl: $f(x)$) = canvas(length: 1cm, {
+  import draw: *
+  let P((x, y)) = (x * sx, y * sy)
+  line(P((0, ymin)), P((0, ymax)), stroke: 0.5pt, mark: (end: "stealth"))
+  line(P((0, 0)), P((xmax, 0)), stroke: 0.5pt, mark: (end: "stealth"))
+  content((xmax * sx + 0.3, 0), text(8pt, xl))
+  content((0, ymax * sy + 0.3), text(8pt, yl))
+  for (t, l) in xt.map(tk) { line(P((t, 0)), (t * sx, -0.08)); content((t * sx, -0.3), text(7pt, l)) }
+  for (t, l) in yt.map(tk) { line(P((0, t)), (-0.08, t * sy)); content((-0.15, t * sy), anchor: "east", text(7pt, l)) }
+  for (a, b, f) in pezzi { line(P((a, f(a))), P((b, f(b))), stroke: 1.4pt + blu) }
+  for p in pieni { circle(P(p), radius: 0.08, fill: blu, stroke: none) }
+  for p in vuoti { circle(P(p), radius: 0.08, fill: white, stroke: 0.8pt + blu) }
+})
+
 #let si = text(fill: verde, weight: "bold")[✓]
 #let no = text(fill: red, weight: "bold")[✗]
 
@@ -866,3 +892,168 @@ $ sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad "per 
 La prima somma è sugli archi che *entrano* in $i$, la seconda su quelli che *escono*. Per il nodo 1: $x_(2 1) - x_(1 5) = -1$, che è $x_(2 1) + 1 = x_(1 5)$ di prima.
 
 Tutto quello che le sorgenti offrono deve essere assorbito dai pozzi, quindi i deficit sommati fanno zero: $sum_i b_i = 0$. Il deficit del depuratore non è un dato in più: $b_5 = -(b_1 + b_2 + b_3 + b_4) = 3.5$.
+
+Resta il dominio: il flusso non può essere negativo, $x_(i j) >= 0$ per ogni $(i, j) in A$.
+
+#nota[Un nodo *di transito* è solo quello con $b_i = 0$. Se un nodo produce o richiede qualcosa ($b_i != 0$) non è di transito, anche se ci passa dentro il flusso di altri nodi: nelle fognature il 3 riceve l'acqua del 4 ma resta una sorgente.]
+
+*Flusso di costo minimo* (Minimum Cost Flow, MCF). Le fognature sono un caso di un problema più generale: un grafo orientato $G = (V, A)$, un deficit $b_i$ per ogni nodo, un costo $c_(i j)$ per unità di flusso su ogni arco e, in più, una *capacità* $mu_(i j)$: il massimo flusso che l'arco può portare. Il modello è quello di prima con la capacità nel dominio:
+
+$
+min z = & sum_((i, j) in A) c_(i j) x_(i j) &&&& #text(9pt)[← costo del flusso] \
+& sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad && forall i in V quad && #text(9pt)[← conservazione del flusso] \
+& 0 <= x_(i j) <= mu_(i j) quad && forall (i, j) in A quad && #text(9pt)[← capacità e non negatività]
+$
+
+Quando un arco è pieno, il resto del flusso deve prendere altre strade. Le fognature sono un MCF senza capacità ($mu_(i j) = +infinity$): lì la condotta si costruiva della misura giusta per il flusso.
+
+*Cammino di costo minimo* (Shortest Path Problem, SPP). Su un grafo orientato con un costo $c_(i j)$ per arco ci sono un nodo di partenza $s$ e uno di arrivo $t != s$. Si cerca il cammino da $s$ a $t$ che costa meno, come fa Google Maps. Ci sono algoritmi fatti apposta, ma si può scrivere anche come MCF, con due piccole modifiche.
+
+Un cammino è un flusso di *una sola unità*: sono io che mi sposto da $s$ a $t$. Quindi $s$ è una sorgente che offre 1, $t$ un pozzo che chiede 1, e tutti gli altri nodi sono di transito: se il cammino ci passa entra 1 ed esce 1, altrimenti 0 e 0.
+$ b_i = cases(-1 quad & i = s, 1 & i = t, 0 & "altrimenti") $
+Visto che passa una persona sola, la capacità si può mettere a 1 su tutti gli archi ($mu_(i j) = 1$; va bene anche $+infinity$).
+
+#let spn = (("1"): (0, 1.1), ("2"): (2, 2.2), ("3"): (2, 0), ("4"): (4, 1.1))
+#let spa = (("1", "2"), ("1", "3"), ("2", "4"), ("3", "2"), ("3", "4"))
+#let spc = ("1-2": 2, "1-3": 1, "2-4": 1, "3-2": 3, "3-4": 2)
+#let spb = (("1"): -1, ("2"): 0, ("3"): 0, ("4"): 1)
+#let spnote = (("1"): ((-0.75, 0), $s$), ("4"): ((0.75, 0), $t$))
+
+#align(center, grid(columns: 2, column-gutter: 2.5em, row-gutter: 6pt, align: center,
+  rete(spn, spa, evid: ("1-2", "2-4"), note: spnote, etichette: spc.pairs().map(((k, c)) => (k, $c = #c$)).to-dict()),
+  rete(spn, spa, evid: ("1-2", "2-4", "1-3", "3-4"), note: spnote,
+    etichette: ("1-2": $0.5$, "2-4": $0.5$, "1-3": $0.5$, "3-4": $0.5$, "3-2": $0$)),
+  text(8pt)[un cammino ottimo, $1 -> 2 -> 4$], text(8pt)[mezzo cammino per parte: ammesso dal modello],
+))
+
+Nell'esempio i cammini da 1 a 4 sono tre: $1 -> 2 -> 4$ costa $2 + 1 = 3$, $1 -> 3 -> 4$ costa $1 + 2 = 3$, $1 -> 3 -> 2 -> 4$ costa $1 + 3 + 1 = 5$. I primi due sono ottimi, ed è indifferente quale scegliere. Il modello:
+
+#block(breakable: false, grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  table(columns: 4, align: (center, right, center, left), inset: 5pt,
+    [nodo], [entra − esce], [], [$b_i$],
+    ..("1", "2", "3", "4").map(n => {
+      let e = spa.filter(((a, b)) => b == n).map(((a, b)) => $+ x_(#a #b)$)
+      let u = spa.filter(((a, b)) => a == n).map(((a, b)) => $- x_(#a #b)$)
+      ([#n], $#((e + u).join())$, $=$, $#spb.at(n)$)
+    }).flatten()),
+  [
+    $min z = #(spa.map(((a, b)) => { let c = spc.at(a + "-" + b); $#(if c != 1 { str(c) }) x_(#a #b)$ }).join($+$))$
+
+    Nel nodo 1 esce soltanto, nel 4 entra soltanto. Nei nodi 2 e 3 quello che entra deve uscire.
+  ]))
+
+Il modello però ammette anche la soluzione a destra: $x_(1 2) = x_(2 4) = x_(1 3) = x_(3 4) = 0.5$, mezza persona su un cammino e mezza sull'altro. Rispetta tutti i bilanci (nel nodo 2 entra 0,5 ed esce 0,5) e costa $0.5 dot 3 + 0.5 dot 3 = 3$, come l'ottimo. Ma non è un cammino. Per avere un cammino vero serve il *vincolo di interezza*: $x_(i j) in {0, 1}$.
+
+#nota[Se interessa solo il *valore* ottimo (quanto costa il cammino migliore), le variabili continue bastano: il valore esce giusto e il modello si risolve molto più in fretta. Per sapere *quale* cammino fare servono le binarie.]
+
+== Variabili discrete, semicontinue e funzioni a tratti
+
+A volte una variabile non può prendere tutti i valori di un intervallo, ma solo alcuni: pochi valori fissi, oppure zero o un intervallo, oppure deve seguire una funzione fatta a pezzi. Il trucco è sempre lo stesso: *una variabile binaria per ogni caso possibile*, che dice in quale caso sono.
+
+*Variabili a valori discreti*. Nelle fognature $x_(i j)$ era insieme il flusso e la dimensione della condotta. In realtà le condotte esistono solo in tre misure, con portata 0,7, 1,4 e 3: la condotta può essere più grande del flusso che ci passa. Servono due variabili per arco: $x_(i j)$ resta il flusso, e $y_(i j)$ è la dimensione della condotta, con $y_(i j) in {0, 0.7, 1.4, 3}$ (0 = non la costruisco). Ora si paga la condotta, quindi il costo dipende dalla dimensione: $min sum_((i, j) in A) c_(i j) y_(i j)$.
+
+#align(center, asse(3.2, scala: 2.2, punti: (0, 0.7, 1.4, 3), tacche: (0, 0.7, 1.4, 3),
+  sopra: ((0, [tutte $z = 0$]), (0.7, $z^1_(i j) = 1$), (1.4, $z^2_(i j) = 1$), (3, $z^3_(i j) = 1$))))
+
+Un dominio come ${0, 0.7, 1.4, 3}$ non si scrive direttamente: si usa una binaria per ogni valore, $z^h_(i j) = 1$ se la condotta $(i, j)$ ha la misura $h$.
+
+$
+& y_(i j) = 0.7 z^1_(i j) + 1.4 z^2_(i j) + 3 z^3_(i j) quad && forall (i, j) in A quad && #text(9pt)[← la dimensione è la misura scelta] \
+& z^1_(i j) + z^2_(i j) + z^3_(i j) <= 1 quad && forall (i, j) in A quad && #text(9pt)[← al massimo una misura] \
+& x_(i j) <= y_(i j) quad && forall (i, j) in A quad && #text(9pt)[← il flusso non supera la portata] \
+& z^h_(i j) in {0, 1} quad && forall (i, j) in A, h = 1, 2, 3
+$
+
+Il $<= 1$ e non $= 1$ perché posso anche non scegliere nessuna misura: tutte le $z$ a 0 danno $y_(i j) = 0$, e allora $x_(i j) <= 0$, cioè niente condotta e niente flusso. Se lo 0 non fosse ammesso, cioè se dovessi per forza scegliere una delle misure, la somma sarebbe $= 1$. Il vincolo $x_(i j) <= y_(i j)$ è il legame fra le due famiglie di variabili: senza, il $min$ metterebbe tutte le $y$ a 0.
+
+In forma generale, con valori ammessi $d_1, dots, d_n$: $y = sum_(i=1)^n d_i z_i$, $sum_(i=1)^n z_i = 1$ (o $<= 1$ se è ammesso anche lo 0), $z_i in {0, 1}$.
+
+*Variabili semicontinue*. Ora la condotta, se la costruisco, può avere qualunque dimensione fra un minimo $l_(i j)$ e un massimo $u_(i j)$. Quindi $y_(i j)$ vale 0 oppure sta in $[l_(i j), u_(i j)]$: non è un intervallo solo, c'è un buco fra 0 e $l_(i j)$.
+
+#align(center, asse(4, scala: 1.6, punti: (0,), interv: ((1.5, 3.5),), tacche: (0, (1.5, $l_(i j)$), (3.5, $u_(i j)$)),
+  sopra: ((0, [$z = 0$]), (2.5, [$z = 1$: $l_(i j) <= y_(i j) <= u_(i j)$]))))
+
+Con una binaria $z_(i j) = 1$ se costruisco la condotta, *moltiplico i due limiti per $z$*:
+$ l_(i j) z_(i j) <= y_(i j) <= u_(i j) z_(i j) quad quad z_(i j) in {0, 1} $
+Se $z = 1$ restano i limiti originali, $l <= y <= u$. Se $z = 0$ diventa $0 <= y <= 0$, cioè $y = 0$.
+
+*Costi di setup*. Capita spesso nei problemi di produzione. Produrre costa $c$ per ogni unità (costo variabile), ma avviare la produzione, per esempio accendere la macchina, costa $k$ una volta sola, che faccia un pezzo o 500: è il *costo di setup*. In più, se produco, devo farlo fra una quantità minima $l$ e una massima $u$. Con $x$ = quantità prodotta e $y = 1$ se produco:
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  atratti(((0.01, 4, x => 1.5 + 0.5 * x),), 4.5, 0, 4, sx: 0.9, sy: 0.6, pieni: ((0, 0), (4, 3.5)), vuoti: ((0, 1.5),), xt: ((4, $u$),), yt: ((1.5, $k$),), xl: $x$, yl: [costo]),
+  [
+    $
+    min & c x + k y \
+    & l y <= x <= u y \
+    & x >= 0, quad y in {0, 1}
+    $
+    Il costo vale 0 se non produco e $k + c x$ se produco: nel disegno il salto in 0 è il setup.
+  ])
+
+È lo stesso trucco delle semicontinue: se $y = 0$ allora $x = 0$, e $k$ non lo pago; se produco qualcosa il vincolo obbliga $y = 1$, e pago $k$. Una variabile dice *se* produco, l'altra *quanto*.
+
+Se il testo non dà un massimo $u$, il legame fra $x$ e $y$ serve lo stesso. Allora il massimo me lo invento: un numero $M$ *grande a piacere*, più grande di qualunque quantità possibile nel problema (se non si può superare 10, va bene 11 o 20). Con $l = 0$ il vincolo diventa solo $x <= M y$.
+
+*Funzioni lineari a tratti*. Un costo può cambiare forma a pezzi: un prezzo fino a una certa quantità, poi uno sconto, poi un altro prezzo… Esempio:
+
+#let fpezzi = ((0, 2, x => 1 + 2 * x), (3, 4, x => 3), (5, 8, x => 22 - 3 * x))
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  atratti(fpezzi, 8.7, -2.5, 7.5, sx: 0.55, sy: 0.38, pieni: ((0, 0), (2, 5), (3, 3), (4, 3), (5, 7), (8, -2)), vuoti: ((0, 1),),
+    xt: range(1, 9), yt: (-2, 3, 5, 7)),
+  [
+    $ f(x) = cases(0 & x = 0, 1 + 2x quad & x in (0, 2], 3 & x in [3, 4], 22 - 3x & x in [5, 8]) $
+    Fra 2 e 3 e fra 4 e 5 la $x$ non può stare: la funzione ha dei *buchi* (è discontinua).
+  ])
+
+Per scriverla nel modello devo sapere *in quale tratto* sono e *dove*, dentro quel tratto:
+- una binaria per tratto, $z^i = 1$ se $x$ sta nel tratto $i$. Non posso stare in due tratti insieme: $z^1 + z^2 + z^3 <= 1$ (tutte a 0 vuol dire $x = 0$);
+- una continua per tratto, $w^i$ = il valore di $x$ se sono nel tratto $i$, 0 altrimenti. Si lega alla sua $z$ come una semicontinua: $3 z^2 <= w^2 <= 4 z^2$;
+- $x = w^1 + w^2 + w^3$: al più una delle $w$ è diversa da 0, ed è proprio la $x$;
+- in ogni tratto $f$ è una retta, termine noto + pendenza × $x$. Il termine noto è un *costo fisso*, pagato solo se sono in quel tratto (moltiplico per $z^i$); la pendenza è un *costo variabile* (moltiplico per $w^i$).
+
+$
+min f = & z^1 + 2 w^1 + 3 z^2 + 22 z^3 - 3 w^3 &&#text(9pt)[← $1 + 2x$, $3$, $22 - 3x$ tratto per tratto] \
+& x = w^1 + w^2 + w^3 \
+& 0 <= w^1 <= 2 z^1, quad 3 z^2 <= w^2 <= 4 z^2, quad 5 z^3 <= w^3 <= 8 z^3 \
+& z^1 + z^2 + z^3 <= 1 \
+& x, w^1, w^2, w^3 >= 0, quad z^1, z^2, z^3 in {0, 1}
+$
+
+$w^2$ non compare in $f$ perché il secondo tratto è piatto: pendenza 0. Se lo 0 non fosse fra i valori ammessi di $x$, la somma delle $z$ sarebbe $= 1$.
+
+#nota[Il primo tratto è aperto in 0, $(0, 2]$, ma il $<$ stretto non si scrive: si mette $0 <= w^1$. Di solito non cambia niente, perché si minimizza e fra $f = 1$ (primo tratto con $x = 0$) e $f = 0$ il modello sceglie 0. Se servisse davvero, si mette $epsilon z^1 <= w^1$ con $epsilon$ piccolo. All'esame non si chiede.]
+
+In generale, con $n$ tratti $[l_i, u_i]$ che non si sovrappongono e $f = b_i + c_i x$ nel tratto $i$ (la somma delle $z$ è $<= 1$ se è ammesso lo 0, altrimenti $= 1$):
+$ min f = sum_(i=1)^n (b_i z^i + c_i w^i) quad "s.t." quad x = sum_(i=1)^n w^i, quad l_i z^i <= w^i <= u_i z^i, quad sum_(i=1)^n z^i <= 1, quad w^i >= 0, quad z^i in {0, 1} $
+
+*La fonderia con gli sconti*. La fonderia del primo esempio deve sempre produrre 1000 kg, ma ora i tre materiali ferrosi (qui A, B e C, cioè $x_1$, $x_2$, $x_3$) si comprano da tre fornitori, ognuno con le sue condizioni:
+
+#align(center, block(breakable: false, table(columns: 2, align: (center, left), inset: 6pt,
+  [fornitore], [condizioni],
+  [A], [fino a 350 kg 0,03 €/kg; da 350 a 750 kg 0,05 €/kg; oltre 750 kg 0,08 €/kg],
+  [B], [fino a 600 kg 0,04 €/kg; oltre 600 kg 0,02 €/kg; ordini fra 450 e 600 kg non accettati],
+  [C], [10 € fissi per qualunque quantità fra 100 e 400 kg; oltre 400 kg 0,06 €/kg; meno di 100 kg non si può],
+)))
+
+I vincoli sul silicio e sul manganese non cambiano. Cambia la funzione obiettivo: il costo di ogni materiale non è più prezzo × quantità, ma una funzione a tratti della quantità comprata.
+
+Il caso più semplice è B. Tradotto: o ordino *da 0 a 450 kg a 0,04 €/kg*, o ordino *da 600 kg in su a 0,02 €/kg* (tutto al prezzo scontato). Oltre i 1000 kg non serve andare: in tutto ne servono 1000.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  atratti(((0, 450, x => 0.04 * x), (600, 1000, x => 0.02 * x)), 1100, 0, 22, sx: 0.0055, sy: 0.13,
+    pieni: ((0, 0), (450, 18), (600, 12), (1000, 20)), xt: (450, 600, 1000), yt: (12, 18), xl: [kg], yl: [€]),
+  [
+    Due tratti, quindi due binarie e due continue. Il pedice è il materiale (2 = B), l'apice il tratto:
+    - $z^1_2 = 1$ se ordino fra 0 e 450 kg, $w^1_2$ = quanti kg a 0,04 €/kg;
+    - $z^2_2 = 1$ se ordino fra 600 e 1000 kg, $w^2_2$ = quanti kg a 0,02 €/kg.
+  ])
+
+$
+& x_2 = w^1_2 + w^2_2 &&#text(9pt)[← B comprato a uno dei due prezzi] \
+& 0 <= w^1_2 <= 450 z^1_2, quad 600 z^2_2 <= w^2_2 <= 1000 z^2_2 &&#text(9pt)[← ogni quantità nel suo intervallo] \
+& z^1_2 + z^2_2 <= 1, quad z^1_2, z^2_2 in {0, 1} &&#text(9pt)[← al massimo un prezzo (o niente)]
+$
+
+e nella funzione obiettivo il termine $0.030 x_2$ diventa $0.04 w^1_2 + 0.02 w^2_2$.
+
+Va bene anche contare in $w^2_2$ solo i kg *oltre* 600: $x_2 = w^1_2 + 600 z^2_2 + w^2_2$, con $0 <= w^2_2 <= (1000 - 600) z^2_2$ e costo $0.04 w^1_2 + 0.02 dot 600 z^2_2 + 0.02 w^2_2$. È lo stesso modello scritto in un altro modo.
