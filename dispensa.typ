@@ -1259,7 +1259,7 @@ e nella funzione obiettivo il termine $0.030 x_2$ diventa $0.04 w^1_2 + 0.02 w^2
 
 Va bene anche contare in $w^2_2$ solo i kg *oltre* 600: $x_2 = w^1_2 + 600 z^2_2 + w^2_2$, con $0 <= w^2_2 <= (1000 - 600) z^2_2$ e costo $0.04 w^1_2 + 0.02 dot 600 z^2_2 + 0.02 w^2_2$. È lo stesso modello scritto in un altro modo.
 
-Il materiale A ha i prezzi *a scaglioni*: i primi 350 kg costano 0,03 €/kg, i kg *successivi* fino a 750 costano 0,05 €/kg, quelli oltre 750 costano 0,08 €/kg. A differenza di B, comprarne di più non cambia il prezzo di tutto l'ordine: ogni scaglione paga il suo. Per esempio 800 kg costano $350 dot 0.03 + 400 dot 0.05 + 50 dot 0.08 = 34.5$ €.
+Il materiale A ha i prezzi *a scaglioni*: i primi 350 kg costano 0,03 €/kg, i kg *successivi* fino a 750 costano 0,05 €/kg, quelli oltre 750 costano 0,08 €/kg. A differenza di B, comprarne di più non cambia il prezzo di tutto l'ordine: ogni scaglione paga il suo. Per esempio 400 kg costano $350 dot 0.03 + 50 dot 0.05 = 13$ €; con la regola di B (tutto al prezzo del tratto) costerebbero $400 dot 0.05 = 20$ €.
 
 #grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
   atratti(((0, 350, x => 0.03 * x), (350, 750, x => 10.5 + 0.05 * (x - 350)), (750, 1000, x => 30.5 + 0.08 * (x - 750))), 1100, 0, 55,
@@ -1550,6 +1550,29 @@ Un vettore $x = (x_(i j))_((i, j) in A)$ è un *flusso* se rispetta la conservaz
 $ sum_((j, i) in B S(i)) x_(j i) - sum_((i, j) in F S(i)) x_(i j) = b_i quad forall i in N quad quad l_(i j) <= x_(i j) <= u_(i j) quad forall (i, j) in A $
 Il suo costo è $c(x) = sum_((i, j) in A) c_(i j) x_(i j)$; minimizzarlo è il problema di *flusso di costo minimo* (MCF). Quasi tutti i problemi del capitolo si riconducono a un MCF.
 
+*Esempio: la schedulazione della produzione*. La struttura a grafo a volte è nascosta. L'industria dolciaria PereCani produce panettoni e deve decidere come usare la sua linea durante l'anno. Per ogni mese $i = 1, dots, 12$ conosce una stima $b_i$ dei panettoni che venderà, il costo unitario di produzione $c_i$ e la produzione massima $u_i$. I panettoni prodotti in un mese si vendono subito o si mettono in magazzino per i mesi dopo; il magazzino tiene al massimo $U$ panettoni e costa $C$ per panettone. All'inizio contiene $b_0$ panettoni, e alla fine dell'anno ne deve contenere $b_(13)$.
+
+Con $x_i$ = panettoni prodotti nel mese $i$ e $s_i$ = panettoni in magazzino alla fine del mese $i$:
+$
+min & sum_(i=1)^12 (c_i x_i + C s_i) &&#text(9pt)[← produzione + magazzino] \
+& s_(i-1) + x_i - s_i = b_i quad i = 1, dots, 12, quad s_0 = b_0, quad s_(12) = b_(13) &&#text(9pt)[← bilancio del magazzino] \
+& 0 <= x_i <= u_i, quad 0 <= s_i <= U quad i = 1, dots, 12 &&#text(9pt)[← capacità di produzione e di magazzino]
+$
+Il vincolo di bilancio dice: quello che avevo, più quello che produco, meno quello che lascio in magazzino, è quello che vendo. È una conservazione del flusso, e infatti il problema (noto come *Lot Sizing*) è un MCF:
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  rete((("0"): (4, 3), ("1"): (0, 0), ("2"): (2.7, 0), ("3"): (5.4, 0), ("12"): (8.6, 0)),
+    (("0", "1"), ("0", "2"), ("0", "3"), ("0", "12"), ("1", "2"), ("2", "3"), ("3", "12")), scala: 0.72,
+    etichette: ("0-1": $c_1, u_1$, "0-2": $c_2, u_2$, "0-3": $c_3, u_3$, "0-12": $c_(12), u_(12)$, "1-2": $C, U$, "2-3": $C, U$, "3-12": [$dots$]),
+    note: (("0"): ((0, 0.6), $b_0 - b_1 - dots - b_(13)$), ("1"): ((0, -0.6), $b_1 - b_0$), ("2"): ((0, -0.6), $b_2$), ("3"): ((0, -0.6), $b_3$), ("12"): ((0, -0.6), $b_(12) + b_(13)$))),
+  [
+    - un nodo per mese, più un nodo fittizio 0 da cui parte la produzione;
+    - gli archi $(0, i)$ sono la *produzione* del mese $i$: costo $c_i$, capacità $u_i$;
+    - gli archi $(i, i + 1)$ sono il *magazzino*: costo $C$, capacità $U$;
+    - il deficit del mese $i$ è la vendita $b_i$, tolto quello che c'era già in magazzino (nodo 1) o più quello che ci va lasciato (nodo 12);
+    - il deficit del nodo 0 è meno la produzione totale dell'anno: così i deficit sommano a 0.
+  ])
+
 *Trasformazioni equivalenti*. Gli algoritmi lavorano su una forma semplice del problema. Se l'istanza non la rispetta, se ne costruisce una *equivalente*: un'altra rete che ha le stesse soluzioni.
 
 #align(center, table(columns: 2,
@@ -1623,7 +1646,32 @@ Le sorgenti potrebbero dare $4 + 6 = 10$, ma i pozzi chiedono solo $2 + 5 = 7$. 
 #definizione[cammino minimo][Su un grafo orientato $G = (N, A)$, $N = {1, dots, n}$, ogni arco $(i, j)$ ha un costo $c_(i j) in RR$ (anche negativo). Un *cammino* $P$ è una sequenza di archi che collega due nodi, e costa $C(P) = sum_((i, j) in P) c_(i j)$. Dati un'origine $r$ e una destinazione $t$, con $cal(P)_(r t)$ l'insieme dei cammini da $r$ a $t$, il problema è
 $ ("SP") quad min { C(P) : P in cal(P)_(r t) } $]
 
-Come modello è un flusso di costo minimo (@flusso): $b_r = -1$, $b_t = 1$, $b_i = 0$ negli altri nodi, capacità infinite. Se ci sono più cammini ottimi il flusso si può dividere fra loro, e per avere un cammino solo serve il vincolo di interezza $x in {0, 1}^m$; gli algoritmi che vedremo però restituiscono comunque soluzioni intere.
+Come modello è un flusso di costo minimo (@flusso), dove l'origine si chiamava $s$: $b_r = -1$, $b_t = 1$, $b_i = 0$ negli altri nodi, capacità infinite. Se ci sono più cammini ottimi il flusso si può dividere fra loro, e per avere un cammino solo serve il vincolo di interezza $x in {0, 1}^m$; gli algoritmi che vedremo però restituiscono comunque soluzioni intere.
+
+
+*Esempio: le ispezioni su una linea di produzione*. Il cammino minimo risolve anche problemi che non sembrano grafi. Una linea ha $n$ celle di lavorazione, e ogni lotto di $B$ pezzi le attraversa in sequenza. Nella cella $i$ un pezzo diventa difettoso con probabilità $p_i$, e i pezzi difettosi non si possono mandare ai clienti. Alla fine di ogni cella si può fare un'*ispezione*, che scarta i pezzi difettosi; quella finale è obbligatoria, quelle intermedie evitano di lavorare pezzi che verranno comunque scartati. I costi:
+- $q_i$: lavorare un pezzo nella cella $i$;
+- $f_(i j)$: costo fisso di ispezionare il lotto all'uscita della cella $j$, se l'ispezione precedente era all'uscita della cella $i < j$;
+- $h_(i j)$: costo per pezzo della stessa ispezione.
+
+Dopo la cella $i$ i pezzi buoni attesi sono $B_i = B product_(k=1)^i (1 - p_k)$: dopo un'ispezione in $i$ si va avanti solo con quelli, fino all'ispezione successiva. Ispezionare in $i$ e poi di nuovo in $j$ costa
+$ c_(i j) = f_(i j) + B_i h_(i j) + B_i sum_(k=i+1)^j q_k $
+cioè costo fisso, costo per pezzo dell'ispezione, e lavorazione dei $B_i$ pezzi nelle celle da $i + 1$ a $j$. Si aggiunge una cella fittizia 0 prima dell'inizio, con $B_0 = B$, così che $c_(0 j)$ sia il costo quando la *prima* ispezione è in $j$.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  canvas(length: 0.75cm, {
+    import draw: *
+    let x(k) = k * 2
+    for k in range(4) { line((x(k) + 0.3, 0), (x(k + 1) - 0.3, 0), stroke: 0.8pt + grigio, mark: (end: "stealth", fill: grigio)); content((x(k) + 1, -0.3), text(7pt)[$c_(#k #(k + 1))$]) }
+    for (a, b, h) in ((0, 2, 1.1), (1, 3, 1.1), (2, 4, 1.1), (0, 4, 2.2), (0, 3, -1.6), (1, 4, -1.6)) {
+      bezier((x(a) + 0.2, if h > 0 { 0.25 } else { -0.25 }), (x(b) - 0.2, if h > 0 { 0.25 } else { -0.25 }), ((x(a) + x(b)) / 2, h * 1.6), stroke: 0.8pt + grigio, mark: (end: "stealth", fill: grigio))
+      content(((x(a) + x(b)) / 2, h * 0.8 + if h > 0 { 0.2 } else { -0.2 }), box(fill: white, inset: 1pt, text(7pt)[$c_(#a #b)$]))
+    }
+    for k in range(5) { circle((x(k), 0), radius: 0.3, fill: white, stroke: 0.7pt); content((x(k), 0), text(8pt)[#k]) }
+  }),
+  [
+    Il grafo ha i nodi $0, 1, dots, n$ e un arco $(i, j)$ per ogni $j > i$, di costo $c_(i j)$. Ogni cammino da 0 a $n$ è un piano di ispezioni (i nodi toccati sono le celle dove si ispeziona), e il cammino minimo è il piano migliore. Nel disegno $n = 4$: il cammino $0 -> 2 -> 4$ vuol dire ispezionare dopo la cella 2 e alla fine.
+  ])
 
 Prima di cercare il minimo, due cose possono andare storte: il problema può essere *vuoto* o *illimitato*. In tutto il capitolo si usa questo grafo d'esempio (a volte con qualche arco cambiato); i numeri sugli archi sono i costi.
 
@@ -1799,7 +1847,7 @@ Da qui due conseguenze:
 #let dj = spt(10, A10, 1, piu-piccola)
 #align(center, traccia(dj.passi))
 
-Stesse etichette di Bellman-Ford, #if dj.d == bf.d [identiche] else [diverse], ma in #dj.passi.len() estrazioni invece di #bf.passi.len(): *ogni nodo esce da $Q$ una volta sola*.
+#if dj.d == bf.d [Stesse etichette di Bellman-Ford] else [Etichette diverse da Bellman-Ford (errore!)], ma in #dj.passi.len() estrazioni invece di #bf.passi.len(): *ogni nodo esce da $Q$ una volta sola*.
 
 #teorema[Teorema di Dijkstra][Se tutti i costi sono non negativi, ogni nodo viene inserito ed estratto da $Q$ *al più una volta*. ("Al più" perché un nodo non raggiungibile non entra mai.)]
 

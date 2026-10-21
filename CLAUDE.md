@@ -24,7 +24,7 @@ Workflow generale: `../CLAUDE.md`.
 
 Da riprendere: `GrafiRetiFlusso_v3.pdf` **p. 153** (complessità di Prim; il prof ha detto che farà un recap con quella slide), poi flusso massimo (p. 154). La modellazione è finita.
 
-Non in dispensa per scelta: PereCani (lot sizing, Grafi p. 11-15) e ispezioni su linea di produzione (p. 27-31), che il prof ha chiamato "esempi che non affronteremo"; SPT.Acyclic il prof non l'ha svolto a mano ("ce l'avete sulle dispense"), in dispensa c'è l'esempio delle slide.
+All'inizio dei grafi il prof ha detto "vi ho lasciato degli esempi che non affronteremo", e del MCF "ve lo lascio per divertissement": PereCani (Grafi p. 11-15) e ispezioni (p. 27-31, nel buco della registrazione) sono comunque in dispensa, perché sono nelle slide. SPT.Acyclic il prof non l'ha svolto a mano ("ce l'avete sulle dispense"): in dispensa c'è l'esempio delle slide.
 
 Esercizi: `slide/EserciziarioTecincheModellazione.pdf` (modellazione) e `slide/Eserciziario_Grafi.pdf` (SPT.1-12 cammini minimi, MST.1-11, poi flusso massimo e MCF non ancora fatti), utili per la prova 1.
 
