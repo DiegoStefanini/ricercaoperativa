@@ -11,10 +11,25 @@
 #set table(stroke: 0.5pt + luma(180), inset: 6pt)
 #show table.cell.where(y: 0): strong
 #show grid: it => block(breakable: false, it)
+#show table: it => block(breakable: false, it)
 
 #let blu = rgb("#3b6fd8")
 #let verde = rgb("#2e9e5b")
 #let grigio = luma(170)
+#let viola = rgb("#7b4fc9")
+#let rosso = rgb("#c0392b")
+
+#let definizione(titolo, body) = block(
+  fill: rgb("#f4effc"), stroke: (left: 3pt + viola),
+  inset: 10pt, width: 100%,
+)[*Definizione — #titolo.* #body]
+#let teorema(titolo, body) = block(
+  fill: rgb("#fdf0ef"), stroke: (left: 3pt + rosso),
+  inset: 10pt, width: 100%,
+)[*#titolo.* #body]
+// "cosa devi saper fare" all'inizio di un capitolo
+#let obiettivi(..voci) = block(stroke: 1pt + luma(150), radius: 4pt, inset: 10pt, width: 100%)[
+  *Cosa devi saper fare* #list(..voci.pos())]
 
 // osservazione del prof, trappola
 #let nota(body) = block(
@@ -107,7 +122,7 @@
   }
   for (n, (d, c)) in note {
     let p = nodi.at(n)
-    content((p.at(0) + d.at(0), p.at(1) + d.at(1)), text(7pt, c))
+    content((p.at(0) + d.at(0), p.at(1) + d.at(1)), box(fill: white, inset: 1pt, text(8pt, c)))
   }
 })
 
@@ -189,6 +204,183 @@
   for p in vuoti { circle(P(p), radius: 0.08, fill: white, stroke: 0.8pt + blu) }
 })
 
+// ---- capitolo sui grafi: dati degli esempi e algoritmi, tutti calcolati da Typst ----
+// archi = ((i, j, costo), ...) con nodi numerati 1..n; "none" in un'etichetta d vuol dire M (infinito)
+// grafo d'esempio dei cammini minimi: dispari in alto (1 3 5 7 9), pari in basso (2 4 6 8 10)
+#let pos10 = range(1, 11).map(k => (str(k), (calc.quo(k - 1, 2) * 2.1, if calc.odd(k) { 1.8 } else { 0 }))).to-dict()
+#let A10 = ((1, 2, 1), (1, 3, 5), (1, 4, 3), (2, 4, 1), (3, 5, 5), (4, 3, 1), (4, 5, 3), (4, 6, 1), (5, 7, 5),
+  (5, 8, 3), (6, 5, 1), (7, 9, 5), (8, 6, 1), (8, 7, 1), (8, 9, 3), (8, 10, 1), (10, 9, 1))
+// varianti: senza cammino da 1 a 9, con un ciclo negativo, aciclica
+#let cambia(archi, via, nuovi) = archi.filter(e => not via.contains((e.at(0), e.at(1)))) + nuovi
+#let A10vuoto = cambia(A10, ((5, 7), (5, 8), (10, 9)), ((7, 5, 5), (8, 5, 3), (9, 10, 1)))
+#let A10neg = cambia(A10, ((5, 8),), ((5, 8, -3),))
+#let A10aciclico = cambia(A10, ((8, 6),), ((6, 8, 1),))
+
+#let uscenti(archi, i) = archi.filter(e => e.at(0) == i).sorted(key: e => e.at(1))
+#let insieme(Q) = if Q.len() == 0 { $emptyset$ } else { ${#Q.map(str).join(", ")}$ }
+#let valore(v) = if v == none { $M$ } else { $#v$ }
+// disegno: evid = archi in blu, sopra = etichette accanto ai nodi (in alto per la fila sopra, in basso per quella sotto)
+#let disegna(archi, pos: pos10, evid: (), sopra: (:), colore: verde, scala: 0.8) = rete(pos,
+  archi.map(e => (str(e.at(0)), str(e.at(1)))),
+  etichette: archi.map(e => (str(e.at(0)) + "-" + str(e.at(1)), $#e.at(2)$)).to-dict(),
+  evid: evid, scala: scala,
+  note: sopra.pairs().map(((k, v)) => (k, ((0, if pos.at(k).at(1) > 0.5 { 0.62 } else { -0.62 }),
+    box(stroke: 0.5pt + colore, inset: 2pt, text(fill: colore, v))))).to-dict())
+#let etichette-d(d) = range(1, d.len()).map(k => (str(k), valore(d.at(k)))).to-dict()
+#let albero(d, p, r) = range(1, d.len()).filter(k => k != r and d.at(k) != none).map(k => str(p.at(k)) + "-" + str(k))
+
+// visita: Q come fila, p_j = da quale nodo sono arrivato a j (-1 = mai raggiunto)
+#let visita(n, archi, r) = {
+  let p = (-1,) * (n + 1)
+  let Q = (r,)
+  let passi = ()
+  while Q.len() > 0 {
+    let i = Q.first()
+    Q = Q.slice(1)
+    let nuovi = ()
+    for (a, j, c) in uscenti(archi, i) {
+      if j != r and p.at(j) == -1 { p.at(j) = i; nuovi.push(j); Q.push(j) }
+    }
+    passi.push((i, nuovi, Q))
+  }
+  (p: p, passi: passi)
+}
+// etichette d lungo l'albero dei predecessori p
+#let lungo-albero(n, archi, r, p) = {
+  let d = (none,) * (n + 1)
+  d.at(r) = 0
+  for _ in range(n) {
+    for k in range(1, n + 1) {
+      if k != r and p.at(k) > 0 and d.at(p.at(k)) != none {
+        d.at(k) = d.at(p.at(k)) + archi.find(e => e.at(0) == p.at(k) and e.at(1) == k).at(2)
+      }
+    }
+  }
+  d
+}
+// un giro sugli archi fuori dall'albero, in ordine: se (i, j) viola Bellman entra al posto dell'arco che entra in j
+#let correggi(n, archi, r, p) = {
+  let d = lungo-albero(n, archi, r, p)
+  let righe = ()
+  for (i, j, c) in archi.sorted(key: e => e.at(0) * 100 + e.at(1)) {
+    if p.at(j) != i and j != r {
+      let prima = d
+      let viola = d.at(i) + c < d.at(j)
+      if viola { p.at(j) = i; d = lungo-albero(n, archi, r, p) }
+      righe.push((i, j, prima.at(i) + c, prima.at(j), viola, range(1, n + 1).filter(k => d.at(k) != prima.at(k)).map(k => (k, d.at(k)))))
+    }
+  }
+  (d: d, p: p, righe: righe, ottimo: archi.all(((i, j, c)) => d.at(i) + c >= d.at(j)))
+}
+// algoritmo SPT: scegli(Q, d) dice quale nodo estrarre; si ferma dopo max estrazioni
+#let spt(n, archi, r, scegli, max: 60) = {
+  let d = (none,) * (n + 1)
+  let p = (r,) * (n + 1)
+  d.at(r) = 0
+  let Q = (r,)
+  let passi = ()
+  while Q.len() > 0 and passi.len() < max {
+    let i = scegli(Q, d)
+    Q = Q.filter(k => k != i)
+    let cambi = ()
+    for (a, j, c) in uscenti(archi, i) {
+      if d.at(j) == none or d.at(i) + c < d.at(j) {
+        d.at(j) = d.at(i) + c
+        p.at(j) = i
+        cambi.push((j, d.at(j)))
+        if j not in Q { Q.push(j) }
+      }
+    }
+    passi.push((i, cambi, Q))
+  }
+  (d: d, p: p, passi: passi)
+}
+#let fila(Q, d) = Q.first()
+#let piu-piccola(Q, d) = Q.sorted(key: k => d.at(k) * 1000 + k).first()
+#let cambi-d(cambi) = if cambi.len() == 0 [—] else { cambi.map(((j, v)) => $d_#j = #v$).join([, ]) }
+#let traccia(passi, col: [archi $(i, j)$ che violano Bellman → nuova $d_j$]) = table(columns: 4, align: (center, center, left, left), inset: 4pt,
+  [passo], [estraggo $i$], col, [$Q$ dopo],
+  ..passi.enumerate().map(((k, (i, cambi, Q))) => ([#(k + 1)], [#i], cambi-d(cambi), insieme(Q))).flatten())
+
+// numerazione topologica: ogni volta il nodo senza archi entranti (fra quelli rimasti) col nome più piccolo
+#let numera(n, archi) = {
+  let resto = archi
+  let ordine = ()
+  while ordine.len() < n {
+    let liberi = range(1, n + 1).filter(k => k not in ordine and resto.all(e => e.at(1) != k))
+    if liberi.len() == 0 { break }
+    ordine.push(liberi.first())
+    resto = resto.filter(e => e.at(0) != liberi.first())
+  }
+  ordine
+}
+#let rinumera(archi, ordine) = archi.map(((i, j, c)) => (ordine.position(x => x == i) + 1, ordine.position(x => x == j) + 1, c))
+// SPT.Acyclic: nodi in ordine 1..n, ognuno guarda i suoi archi uscenti una volta sola
+#let spt-aciclico(n, archi) = {
+  let d = (none,) * (n + 1)
+  let p = (1,) * (n + 1)
+  d.at(1) = 0
+  let passi = ()
+  for i in range(1, n + 1) {
+    let cambi = ()
+    if d.at(i) != none {
+      for (a, j, c) in uscenti(archi, i) {
+        if d.at(j) == none or d.at(i) + c < d.at(j) { d.at(j) = d.at(i) + c; p.at(j) = i; cambi.push((j, d.at(j))) }
+      }
+    }
+    passi.push((i, cambi))
+  }
+  (d: d, p: p, passi: passi)
+}
+
+// albero di copertura: lati = ((a, b, costo), ...) non orientati
+#let posMST = (("1"): (2, 3), ("2"): (0, 2.2), ("3"): (4, 2.2), ("4"): (2, 1.2), ("5"): (0, 0.2), ("6"): (4, 0.2), ("7"): (2, -0.8))
+#let LMST = ((1, 2, 8), (1, 3, 5), (2, 3, 10), (2, 4, 2), (3, 4, 3), (2, 5, 18), (4, 5, 12), (4, 7, 14), (3, 6, 16), (4, 6, 30), (5, 7, 4), (6, 7, 26))
+#let lato(e) = ${#e.at(0), #e.at(1)}$
+#let kruskal(n, lati) = {
+  let comp = range(n + 1)
+  let S = ()
+  let passi = ()
+  for (a, b, c) in lati.sorted(key: e => e.at(2) * 100 + e.at(0) * 10 + e.at(1)) {
+    if S.len() == n - 1 { break }
+    let entra = comp.at(a) != comp.at(b)
+    if entra {
+      let (vecchia, nuova) = (comp.at(b), comp.at(a))
+      comp = comp.map(x => if x == vecchia { nuova } else { x })
+      S.push((a, b, c))
+    }
+    passi.push((a, b, c, entra))
+  }
+  (S: S, passi: passi)
+}
+#let prim(n, lati, r) = {
+  let d = (none,) * (n + 1)
+  let p = (r,) * (n + 1)
+  let fisso = (false,) * (n + 1)
+  d.at(r) = 0
+  let Q = (r,)
+  let costo = 0
+  let passi = ()
+  while Q.len() > 0 {
+    let u = Q.sorted(key: k => d.at(k) * 1000 + k).first()
+    Q = Q.filter(k => k != u)
+    if u != r { costo += d.at(u) }
+    fisso.at(u) = true
+    let cambi = ()
+    for (a, b, c) in lati.filter(e => e.at(0) == u or e.at(1) == u).sorted(key: e => e.at(0) + e.at(1) - u) {
+      let v = if a == u { b } else { a }
+      if not fisso.at(v) and (d.at(v) == none or c < d.at(v)) {
+        d.at(v) = c
+        p.at(v) = u
+        cambi.push((v, c))
+        if v not in Q { Q.push(v) }
+      }
+    }
+    passi.push((u, p.at(u), cambi, Q, costo))
+  }
+  (p: p, passi: passi, costo: costo)
+}
+
 #let si = text(fill: verde, weight: "bold")[✓]
 #let no = text(fill: red, weight: "bold")[✗]
 
@@ -202,6 +394,15 @@
 #outline(depth: 2)
 
 = Tecniche di modellazione
+
+#obiettivi(
+  [tradurre un testo in un modello: variabili con il loro dominio, funzione obiettivo, vincoli;],
+  [scrivere con variabili binarie le relazioni logiche (almeno uno, implicazione, and, or, xor) e controllarle con la tabella di verità;],
+  [legare due famiglie di variabili (frequenze e antenne, bonus e piatti, flusso e condotta);],
+  [scrivere i vincoli di conservazione del flusso a partire dai deficit;],
+  [modellare variabili discrete, semicontinue, costi di setup e funzioni a tratti;],
+  [rendere lineari un min-max, un valore assoluto, un "oppure" fra vincoli, un prodotto di probabilità.],
+)
 
 Un modello ha sempre tre pezzi: *variabili* (le decisioni), *funzione obiettivo* (cosa minimizzo o massimizzo), *vincoli* (cosa devo rispettare).
 
@@ -442,7 +643,7 @@ tv(("A", "B", "C"),
 
 #nota[Schema che si ripete: il "*devo*" (se … allora C) è un vincolo $x_C >= dots$ che spinge C a 1; il "*posso solo se*" è un vincolo $x_C <= dots$ che tiene C a 0.]
 
-== Scegliere lati di un grafo: albero di copertura e commesso viaggiatore
+== Scegliere lati di un grafo: albero di copertura e commesso viaggiatore <mst-modello>
 
 Nello zaino le variabili binarie sceglievano un *sottoinsieme* dei progetti. Qui scelgono un sottoinsieme dei *lati di un grafo*, e i vincoli gli impongono una forma: prima un albero, poi un ciclo.
 
@@ -838,7 +1039,7 @@ I vincoli hanno la forma della partizione, con $q_i$ al posto di 1: sommo i camm
 
 #nota[Tutta la difficoltà sta nel generare i cammini; il modello poi è semplice. Qui si può fare perché i cammini hanno al più 4 fermate: con giri lunghi sarebbero troppi, e si generano solo quando servono (generazione di colonne, non si fa nel corso).]
 
-== Problemi di flusso su rete
+== Problemi di flusso su rete <flusso>
 
 Le variabili *binarie* dicono se faccio una cosa, le *intere* quante volte. Anche una variabile *continua* (un numero reale) può dire sì o no: se vale 0 la scelta non è fatta, se è positiva è fatta e il valore dice *quanto*.
 
@@ -897,21 +1098,21 @@ Resta il dominio: il flusso non può essere negativo, $x_(i j) >= 0$ per ogni $(
 
 #nota[Un nodo *di transito* è solo quello con $b_i = 0$. Se un nodo produce o richiede qualcosa ($b_i != 0$) non è di transito, anche se ci passa dentro il flusso di altri nodi: nelle fognature il 3 riceve l'acqua del 4 ma resta una sorgente.]
 
-*Flusso di costo minimo* (Minimum Cost Flow, MCF). Le fognature sono un caso di un problema più generale: un grafo orientato $G = (V, A)$, un deficit $b_i$ per ogni nodo, un costo $c_(i j)$ per unità di flusso su ogni arco e, in più, una *capacità* $mu_(i j)$: il massimo flusso che l'arco può portare. Il modello è quello di prima con la capacità nel dominio:
+*Flusso di costo minimo* (Minimum Cost Flow, MCF). Le fognature sono un caso di un problema più generale: un grafo orientato $G = (N, A)$, un deficit $b_i$ per ogni nodo, un costo $c_(i j)$ per unità di flusso su ogni arco e, in più, una *capacità* $u_(i j)$: il massimo flusso che l'arco può portare. Il modello è quello di prima con la capacità nel dominio:
 
 $
 min z = & sum_((i, j) in A) c_(i j) x_(i j) &&&& #text(9pt)[← costo del flusso] \
-& sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad && forall i in V quad && #text(9pt)[← conservazione del flusso] \
-& 0 <= x_(i j) <= mu_(i j) quad && forall (i, j) in A quad && #text(9pt)[← capacità e non negatività]
+& sum_(j : (j, i) in A) x_(j i) - sum_(j : (i, j) in A) x_(i j) = b_i quad && forall i in N quad && #text(9pt)[← conservazione del flusso] \
+& 0 <= x_(i j) <= u_(i j) quad && forall (i, j) in A quad && #text(9pt)[← capacità e non negatività]
 $
 
-Quando un arco è pieno, il resto del flusso deve prendere altre strade. Le fognature sono un MCF senza capacità ($mu_(i j) = +infinity$): lì la condotta si costruiva della misura giusta per il flusso.
+Quando un arco è pieno, il resto del flusso deve prendere altre strade. Le fognature sono un MCF senza capacità ($u_(i j) = +infinity$): lì la condotta si costruiva della misura giusta per il flusso.
 
 *Cammino di costo minimo* (Shortest Path Problem, SPP). Su un grafo orientato con un costo $c_(i j)$ per arco ci sono un nodo di partenza $s$ e uno di arrivo $t != s$. Si cerca il cammino da $s$ a $t$ che costa meno, come fa Google Maps. Ci sono algoritmi fatti apposta, ma si può scrivere anche come MCF, con due piccole modifiche.
 
 Un cammino è un flusso di *una sola unità*: sono io che mi sposto da $s$ a $t$. Quindi $s$ è una sorgente che offre 1, $t$ un pozzo che chiede 1, e tutti gli altri nodi sono di transito: se il cammino ci passa entra 1 ed esce 1, altrimenti 0 e 0.
 $ b_i = cases(-1 quad & i = s, 1 & i = t, 0 & "altrimenti") $
-Visto che passa una persona sola, la capacità si può mettere a 1 su tutti gli archi ($mu_(i j) = 1$; va bene anche $+infinity$).
+Visto che passa una persona sola, la capacità si può mettere a 1 su tutti gli archi ($u_(i j) = 1$; va bene anche $+infinity$).
 
 #let spn = (("1"): (0, 1.1), ("2"): (2, 2.2), ("3"): (2, 0), ("4"): (4, 1.1))
 #let spa = (("1", "2"), ("1", "3"), ("2", "4"), ("3", "2"), ("3", "4"))
@@ -946,7 +1147,7 @@ Il modello però ammette anche la soluzione a destra: $x_(1 2) = x_(2 4) = x_(1 
 
 #nota[Se interessa solo il *valore* ottimo (quanto costa il cammino migliore), le variabili continue bastano: il valore esce giusto e il modello si risolve molto più in fretta. Per sapere *quale* cammino fare servono le binarie.]
 
-== Variabili discrete, semicontinue e funzioni a tratti
+== Variabili discrete, semicontinue e funzioni a tratti <tratti>
 
 A volte una variabile non può prendere tutti i valori di un intervallo, ma solo alcuni: pochi valori fissi, oppure zero o un intervallo, oppure deve seguire una funzione fatta a pezzi. Il trucco è sempre lo stesso: *una variabile binaria per ogni caso possibile*, che dice in quale caso sono.
 
@@ -1057,3 +1258,753 @@ $
 e nella funzione obiettivo il termine $0.030 x_2$ diventa $0.04 w^1_2 + 0.02 w^2_2$.
 
 Va bene anche contare in $w^2_2$ solo i kg *oltre* 600: $x_2 = w^1_2 + 600 z^2_2 + w^2_2$, con $0 <= w^2_2 <= (1000 - 600) z^2_2$ e costo $0.04 w^1_2 + 0.02 dot 600 z^2_2 + 0.02 w^2_2$. È lo stesso modello scritto in un altro modo.
+
+Il materiale A ha i prezzi *a scaglioni*: i primi 350 kg costano 0,03 €/kg, i kg *successivi* fino a 750 costano 0,05 €/kg, quelli oltre 750 costano 0,08 €/kg. A differenza di B, comprarne di più non cambia il prezzo di tutto l'ordine: ogni scaglione paga il suo. Per esempio 800 kg costano $350 dot 0.03 + 400 dot 0.05 + 50 dot 0.08 = 34.5$ €.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  atratti(((0, 350, x => 0.03 * x), (350, 750, x => 10.5 + 0.05 * (x - 350)), (750, 1000, x => 30.5 + 0.08 * (x - 750))), 1100, 0, 55,
+    sx: 0.0055, sy: 0.07, pieni: ((350, 10.5), (750, 30.5), (1000, 50.5)), xt: (350, 750, 1000), yt: ((10.5, [10,5]), (30.5, [30,5]), (50.5, [50,5])), xl: [kg], yl: [€]),
+  [
+    Il costo totale è una funzione a tratti *senza buchi*, e ogni tratto è più ripido del precedente. Una binaria e una continua per scaglione, ma qui la continua conta solo i kg *dentro* quello scaglione:
+    - $w^1_1$ = kg comprati fra 0 e 350, $w^2_1$ = kg fra 350 e 750, $w^3_1$ = kg fra 750 e 1000;
+    - $z^h_1 = 1$ se uso lo scaglione $h$.
+  ])
+
+$
+& x_1 = w^1_1 + w^2_1 + w^3_1 &&#text(9pt)[← A comprato = somma degli scaglioni] \
+& 0 <= w^1_1 <= 350 z^1_1, quad 0 <= w^2_1 <= (750 - 350) z^2_1, quad 0 <= w^3_1 <= (1000 - 750) z^3_1 \
+& z^1_1 >= z^2_1 >= z^3_1, quad z^1_1, z^2_1, z^3_1 in {0, 1} &&#text(9pt)[← uno scaglione si apre solo se è aperto il precedente]
+$
+
+e nella funzione obiettivo il costo di A diventa $f_1 = 0.03 w^1_1 + 0.05 w^2_1 + 0.08 w^3_1$.
+
+#nota[Il modello non obbliga a *riempire* uno scaglione prima di passare al successivo: $w^1_1 = 0$, $w^2_1 = 400$ è ammesso. Non succede perché si minimizza e lo scaglione prima costa meno: il $min$ lo riempie da solo.]
+
+Proprio per questo le binarie di A si possono togliere. Quando i prezzi *crescono* con la quantità ($0.03 <= 0.05 <= 0.08$) la funzione si dice *convessa*, e il $min$ usa da solo gli scaglioni nell'ordine giusto, dal più economico:
+$
+min & 0.03 w^1_1 + 0.05 w^2_1 + 0.08 w^3_1 \
+& x_1 = w^1_1 + w^2_1 + w^3_1, quad 0 <= w^1_1 <= 350, quad 0 <= w^2_1 <= 750 - 350, quad 0 <= w^3_1 <= 1000 - 750
+$
+Conviene, perché le binarie rendono il problema molto più difficile da risolvere. Se invece i prezzi *calassero* con la quantità (funzione *concava*), il $min$ riempirebbe per primo lo scaglione più economico, l'ultimo, saltando gli altri: lì le binarie servono.
+
+Resta C: 10 € fissi per un ordine fra 100 e 400 kg; oltre 400 kg, 10 € più 0,06 €/kg per i kg oltre 400; meno di 100 kg non si può. Oppure non compro niente.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  atratti(((100, 400, x => 10), (400, 1000, x => 10 + 0.06 * (x - 400))), 1100, 0, 50, sx: 0.0055, sy: 0.075,
+    pieni: ((0, 0), (100, 10), (1000, 46)), xt: (100, 400, 1000), yt: (10, 46), xl: [kg], yl: [€]),
+  [
+    Due tratti, scritti come la seconda forma di B (la continua conta i kg *oltre* l'inizio del tratto):
+    - $z^1_3 = 1$ se ordino fra 100 e 400 kg, $w^1_3$ = kg oltre 100;
+    - $z^2_3 = 1$ se ordino fra 400 e 1000 kg, $w^2_3$ = kg oltre 400.
+  ])
+
+$
+& x_3 = 100 z^1_3 + w^1_3 + 400 z^2_3 + w^2_3 \
+& 0 <= w^1_3 <= (400 - 100) z^1_3, quad 0 <= w^2_3 <= (1000 - 400) z^2_3 \
+& z^1_3 + z^2_3 <= 1, quad z^1_3, z^2_3 in {0, 1} &&#text(9pt)[← un tratto, l'altro o niente] \
+& f_3 = 10 z^1_3 + 10 z^2_3 + 0.06 w^2_3 &&#text(9pt)[← costo di C]
+$
+
+Il 100 e il 400 entrano in $x_3$ moltiplicati per la binaria: con $z^1_3 = 1$ ho già 100 kg, il minimo ordinabile. La funzione obiettivo completa è $min f_1 + f_2 + f_3 + 10 x_4$, con $f_2$ il costo di B scritto prima e $10 x_4$ il manganese puro, che non cambia.
+
+== Linearizzazioni: min-max, valore assoluto, vincoli disgiuntivi
+
+Finora ogni vincolo era lineare, o lo diventava con una binaria per caso. Restano tre cose che lineari non sono: il *massimo* fra più quantità, il *valore assoluto*, un *"oppure"* fra due vincoli. Per ognuna c'è un trucco.
+
+*Ordinamento di lavori su macchine: minimizzare il tempo di completamento*. Una compagnia logistica ha $n$ barche $B = {1, dots, n}$, tutte già in rada, da assegnare ai moli $M = {1, dots, m}$ per lo scarico. La barca $i$ occupa il molo per un tempo $p_i$; un molo serve una barca alla volta, e le barche possono aspettare in rada finché vengono chiamate. Si vuole finire il prima possibile: minimizzare il *tempo di completamento massimo* (makespan), l'istante in cui termina l'ultimo scarico.
+
+Rispetto ai moli di prima cambia tutto: i moli sono dati, le barche aspettano, e conta quando si finisce. Una barca per molo alla volta, senza buchi: il molo $j$ finisce dopo $sum_(i in B) p_i x_(i j)$, la somma dei tempi delle barche che gli assegno ($x_(i j) = 1$ se la barca $i$ va al molo $j$). Il makespan è il massimo fra i moli:
+$ min max_(j in M) sum_(i in B) p_i x_(i j) $
+Non è lineare. Il trucco: una variabile $t >= 0$ che deve stare *sopra tutti* i tempi dei moli. (Si può anche dare un nome al tempo di fine di ogni molo, $T_j = sum_i p_i x_(i j)$, e chiedere $t >= T_j$: è lo stesso modello con variabili in più.) Se $t$ sta sopra a tutti, sta sopra al più grande; il $min$ la spinge giù finché tocca il più grande.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  canvas(length: 0.7cm, {
+    import draw: *
+    for (k, (pezzi, nome)) in (((3, 2), [molo 1]), ((4,), [molo 2]), ((2, 1), [molo 3])).enumerate() {
+      let y = (2 - k) * 1.2
+      content((-0.3, y + 0.4), anchor: "east", text(8pt, nome))
+      let x = 0
+      for q in pezzi { rect((x, y), (x + q, y + 0.8), fill: rgb("#d6e4ff"), stroke: 0.6pt + blu); x += q }
+    }
+    line((5, -0.4), (5, 3.6), stroke: (paint: red, dash: "dashed"))
+    content((5, 4), text(8pt, fill: red)[$t$])
+    line((0, -0.4), (6, -0.4), mark: (end: "stealth"))
+    content((6.6, -0.4), text(7pt)[tempo])
+  }),
+  [
+    Ogni barra è un molo, divisa nelle sue barche. La linea rossa è $t$: deve stare a destra di tutte le barre, e al minimo coincide con la più lunga.
+  ])
+
+$
+min & t &&&& #text(9pt)[← makespan] \
+& sum_(j in M) x_(i j) = 1 quad && forall i in B quad && #text(9pt)[← ogni barca a un solo molo] \
+& sum_(i in B) p_i x_(i j) <= t quad && forall j in M quad && #text(9pt)[← ogni molo finisce entro $t$] \
+& x_(i j) in {0, 1} quad && forall i in B, j in M, quad t >= 0
+$
+
+Lo stesso trucco vale per qualunque *min-max* e *max-min*. Date delle funzioni lineari $f_i (x) = sum_j a_(i j) x_j + b_i$, una per ogni $i in F$, si aggiunge una variabile $v$:
+
+#align(center, table(columns: 3, align: (left, center, center),
+  [], [min-max], [max-min],
+  [problema], $min { max_(i in F) f_i (x) }$, $max { min_(i in F) f_i (x) }$,
+  [diventa], $min v quad "s.t." quad v >= f_i (x) quad forall i in F$, $max v quad "s.t." quad v <= f_i (x) quad forall i in F$,
+))
+
+#nota[Funziona solo in queste due combinazioni, dove la funzione obiettivo spinge $v$ *contro* i vincoli. Con un max-max, $max v$ e $v >= f_i (x)$, niente ferma $v$: sale all'infinito.]
+
+*Equipartizione*. Due fratelli devono spartirsi un'eredità di $n$ beni indivisibili; il bene $i$ vale $a_i$. Vogliono dividerli in due gruppi di valore il più vicino possibile: se $S$ sono i beni del primo fratello,
+$ min { thin abs(sum_(i in S) a_i - sum_(i in.not S) a_i) : S subset.eq {1, dots, n} } $
+
+Con $x_i = 1$ se il bene $i$ va al fratello 1 e $x_i = 0$ se va al fratello 2, il primo riceve $sum a_i x_i$ e il secondo $sum a_i (1 - x_i)$ (gli $x_i = 0$ diventano 1). Quindi
+$ min z = abs(sum_(i=1)^n a_i x_i - sum_(i=1)^n a_i (1 - x_i)), quad x_i in {0, 1} $
+che non è lineare per via del valore assoluto.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  canvas(length: 0.55cm, {
+    import draw: *
+    line((-3, 0), (3, 0), mark: (end: "stealth"), stroke: 0.5pt)
+    line((0, -0.5), (0, 3.3), mark: (end: "stealth"), stroke: 0.5pt)
+    line((-2.8, -2.8 + 0.001), (0.5, 0.5), stroke: (paint: grigio, dash: "dashed"))
+    line((2.8, -2.8 + 0.001), (-0.5, 0.5), stroke: (paint: grigio, dash: "dashed"))
+    line((-3, 3), (0, 0), (3, 3), stroke: 1.4pt + blu)
+    content((3.2, 2.2), text(7pt, fill: grigio)[$x$])
+    content((-3.3, 2.2), text(7pt, fill: grigio)[$-x$])
+    content((1.2, 3.1), text(8pt, fill: blu)[$abs(x)$])
+  }),
+  [
+    Il valore assoluto è un massimo: $abs(x) = max{x, -x}$. In blu $abs(x)$, che in ogni punto coincide con la più alta delle due rette tratteggiate.
+
+    Quindi minimizzare $abs(f(x))$ è un min-max, e si sa scrivere:
+    $ min abs(f(x)) = min max{f(x), -f(x)} quad -> quad min v quad "s.t." quad v >= f(x), quad v >= -f(x) $
+  ])
+
+Per l'equipartizione:
+$
+min & v \
+& v >= sum_(i=1)^n a_i x_i - sum_(i=1)^n a_i (1 - x_i) \
+& v >= sum_(i=1)^n a_i (1 - x_i) - sum_(i=1)^n a_i x_i \
+& x_i in {0, 1} quad i = 1, dots, n
+$
+
+*Vincoli disgiuntivi*. In Programmazione Lineare l'insieme dei punti ammissibili è descritto da un numero finito di vincoli lineari $A_i x <= b_i$, $i = 1, dots, m$ ($A_i$ è la riga dei coefficienti del vincolo $i$). Valgono *tutti insieme*: l'insieme è l'*intersezione* dei vincoli, e si chiama *poliedro convesso*. *Convesso* vuol dire che, presi due punti dentro, tutto il segmento che li unisce resta dentro.
+
+#let quadrato(regioni, scritte) = canvas(length: 1.1cm, {
+  import draw: *
+  line((0, 0), (2.5, 0), mark: (end: "stealth"), stroke: 0.5pt)
+  line((0, 0), (0, 2.5), mark: (end: "stealth"), stroke: 0.5pt)
+  content((2.75, 0), text(7pt)[$x_1$])
+  content((0, 2.75), text(7pt)[$x_2$])
+  rect((0, 0), (2, 2), stroke: 0.4pt + grigio)
+  for r in regioni { line(..r, close: true, fill: rgb("#d6e4ff"), stroke: 0.8pt + blu) }
+  for (p, t) in scritte { content(p, text(7pt, t)) }
+  for t in (1, 2) { content((t, -0.25), text(7pt)[#t]); content((-0.2, t), text(7pt)[#t]) }
+})
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  quadrato((((0, 0), (1, 1), (2, 0)),), ()),
+  [
+    Esempio: $x_1 + x_2 <= 2$ (I), $-x_1 + x_2 <= 0$ (II), $0 <= x_1 <= 2$, $0 <= x_2 <= 2$. Il punto deve stare sotto la retta di I *e* sotto quella di II: è il triangolo di vertici $(0, 0)$, $(1, 1)$, $(2, 0)$.
+  ])
+
+Per il prof i vincoli disgiuntivi sono "la cosa più bella che può capitare" all'esame e all'orale. E se volessi "vale I *oppure* vale II"? L'insieme diventa l'*unione* dei due triangoli, e non è convesso: $(0, 2)$ e $(2, 2)$ stanno dentro, il punto in mezzo $(1, 2)$ no. Con i soli vincoli lineari non si può scrivere.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  quadrato((((0, 0), (2, 0), (0, 2)), ((0, 0), (2, 0), (2, 2))), (((0.45, 1.75), [I]), ((1.75, 1.75), [II]))),
+  [
+    Si usa una binaria per vincolo che dice se lo posso *violare*:
+    - $y_I = 1$ se posso violare $x_1 + x_2 <= 2$, 0 altrimenti;
+    - $y_(I I) = 1$ se posso violare $-x_1 + x_2 <= 0$, 0 altrimenti;
+
+    e si vieta di violarli tutti e due.
+  ])
+
+$
+& 0 <= x_1 <= 2, quad 0 <= x_2 <= 2 &&#text(9pt)[← non cambiano] \
+& x_1 + x_2 <= 2 + M_I y_I \
+& -x_1 + x_2 <= 0 + M_(I I) y_(I I) \
+& y_I + y_(I I) <= 1, quad y_I, y_(I I) in {0, 1} &&#text(9pt)[← non posso violarli entrambi]
+$
+
+Con $y_I = 0$ il vincolo I è quello originale; con $y_I = 1$ il lato destro sale di $M_I$ e, se $M_I$ è abbastanza grande, il vincolo è sempre vero: è come se non ci fosse. Quanto grande? Quanto il massimo che il lato sinistro può superare il destro nel quadrato: $max{x_1 + x_2 - 2} = 2$ e $max{-x_1 + x_2} = 2$, quindi bastano $M_I = M_(I I) = 2$. È il big-M dei costi di setup, usato per spegnere un vincolo.
+
+In generale: ho dei vincoli $A_i x <= b_i$, $i = 1, dots, m$, e dei sottoinsiemi di indici $S_1, dots, S_p$ (lo stesso vincolo può stare in più gruppi). Ogni gruppo descrive un poliedro convesso $X_h = {x : A_i x <= b_i, i in S_h}$, e voglio l'unione $X = X_1 union dots union X_p$, cioè "vale almeno un gruppo". Con una binaria $y_h$ per gruppo, che vale 1 se *spengo* il gruppo $h$:
+$ A_i x - M_h y_h <= b_i quad forall i in S_h, h = 1, dots, p quad quad y_1 + dots + y_p <= p - 1 quad quad y_h in {0, 1} $
+Al massimo $p - 1$ gruppi spenti: almeno uno resta acceso, e $x$ sta nel suo poliedro. Le costanti $M_h$ si scelgono in modo che con $y_h = 1$ i vincoli del gruppo diventino ridondanti; si può sempre se gli $X_h$ sono limitati (altrimenti si aggiungono dei limiti artificiali). Con le $y_h$ si possono poi scrivere relazioni logiche fra i gruppi, come quelle fra i progetti.
+
+*La fonderia con le proprietà*. Ancora la fonderia del primo esempio (1000 kg, tre materiali ferrosi e manganese puro, stessi dati), con due novità:
++ per essere venduto il ferro deve avere *almeno una* di tre proprietà: (i) almeno lo 0,45% di manganese; (ii) almeno il 3,25% di silicio; (iii) al più il 5,5% di silicio;
++ se ne ha *almeno due*, la fonderia prende un bonus di 127 € sul prezzo di vendita.
+
+Si vuole il piano di produzione di costo minimo, al netto del bonus. I tre vincoli di qualità del modello originale ora non devono valere tutti: ne basta uno, è un vincolo disgiuntivo con tre gruppi di un vincolo ciascuno. Le binarie:
+- $y_i$, $y_(i i)$, $y_(i i i)$ = 1 se il ferro ha la proprietà (i), (ii), (iii);
+- $w = 1$ se le proprietà soddisfatte sono almeno due (prendo il bonus).
+
+$
+min z = & 0.025 x_1 + 0.030 x_2 + 0.018 x_3 + 10 x_4 - 127 w &&#text(9pt)[← costo meno bonus] \
+& x_1 + x_2 + x_3 + x_4 = 1000 \
+& 45 x_1 + 50 x_2 + 40 x_3 + 10000 x_4 >= 45000 - M (1 - y_i) &&#text(9pt)[← (i) manganese minimo] \
+& 40 x_1 + 10 x_2 + 6 x_3 >= 32500 - M (1 - y_(i i)) &&#text(9pt)[← (ii) silicio minimo] \
+& 40 x_1 + 10 x_2 + 6 x_3 <= 55000 + M (1 - y_(i i i)) &&#text(9pt)[← (iii) silicio massimo] \
+& y_i + y_(i i) + y_(i i i) >= 1 &&#text(9pt)[← almeno una proprietà] \
+& 2 w <= y_i + y_(i i) + y_(i i i) &&#text(9pt)[← bonus solo con almeno due] \
+& x_1, x_2, x_3, x_4 >= 0, quad y_i, y_(i i), y_(i i i), w in {0, 1}
+$
+
+Qui la binaria dice che il vincolo *vale*, quindi il vincolo si spegne con $y = 0$: per questo compare $1 - y$. Se la binaria dicesse "posso violarlo", come nell'esempio dei triangoli, basta sostituire ogni $y$ con $1 - y$: $-M y$ al posto di $-M (1 - y)$, e "almeno una proprietà" diventa $y_i + y_(i i) + y_(i i i) <= 2$ (al più due violate). Il bonus funziona come quello dell'home restaurant: con $w = 1$ il vincolo chiede almeno due $y$ a 1, e il $-127 w$ nel $min$ spinge $w$ a 1 appena può.
+
+Per i due vincoli con $>=$ il big-M non serve. Il lato sinistro non è mai negativo, quindi basta moltiplicare il lato destro per la binaria:
+$ 45 x_1 + 50 x_2 + 40 x_3 + 10000 x_4 >= 45000 y_i quad quad 40 x_1 + 10 x_2 + 6 x_3 >= 32500 y_(i i) $
+Con $y = 1$ è il vincolo originale, con $y = 0$ diventa "$>= 0$", sempre vero. Sul vincolo con $<=$ non si può fare: moltiplicato per 0 diventerebbe "$<= 0$", che invece obbliga tutto a zero.
+
+*Dislocazione ottima di impianti*. La società MilanNet vuole aprire fino a $n$ uffici di assistenza per i suoi $m$ clienti, scegliendo fra $n$ siti $I = {1, dots, n}$. Aprire l'ufficio $i$ costa $d_i$, e l'ufficio può seguire al massimo $u_i$ clienti; gestire il cliente $j in J = {1, dots, m}$ dall'ufficio $i$ costa $c_(i j)$. Ogni cliente va assegnato a *uno e un solo* ufficio aperto, al costo complessivo (apertura più gestione) minimo.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  canvas(length: 0.85cm, {
+    import draw: *
+    let uffici = ((0, 2.4, true), (0, 1.2, false), (0, 0, true))
+    let clienti = ((3, 3), (3, 2), (3, 1), (3, 0), (3, -1))
+    let a = ((0, 0), (0, 1), (2, 2), (2, 3), (2, 4))
+    for (u, c) in a { line((uffici.at(u).at(0), uffici.at(u).at(1)), clienti.at(c), stroke: 1pt + blu) }
+    for (x, y, aperto) in uffici { rect((x - 0.3, y - 0.3), (x + 0.3, y + 0.3), fill: if aperto { rgb("#fff3c4") } else { luma(230) }, stroke: 0.6pt) }
+    for p in clienti { circle(p, radius: 0.22, fill: white, stroke: 0.6pt) }
+    content((0, 3.3), text(7pt)[uffici $I$])
+    content((3, 3.8), text(7pt)[clienti $J$])
+  }),
+  [
+    I quadrati sono i siti (in giallo quelli aperti, $y_i = 1$), i cerchi i clienti. Ogni linea blu è un $x_(i j) = 1$: ogni cliente ne ha esattamente una, e solo verso un ufficio aperto.
+  ])
+
+*Variabili*: $y_i in {0, 1}$ vale 1 se apro l'ufficio $i$; $x_(i j) in {0, 1}$ vale 1 se assegno il cliente $j$ all'ufficio $i$.
+
+$
+min z = & sum_(i in I) sum_(j in J) c_(i j) x_(i j) + sum_(i in I) d_i y_i &&&& #text(9pt)[← gestione + apertura] \
+& sum_(i in I) x_(i j) = 1 quad && j in J quad && #text(9pt)[← ogni cliente a un solo ufficio] \
+& sum_(j in J) x_(i j) <= u_i quad && i in I quad && #text(9pt)[← al più $u_i$ clienti per ufficio] \
+& x_(i j) <= y_i quad && i in I, j in J quad && #text(9pt)[← solo verso un ufficio aperto] \
+& y_i in {0, 1}, quad x_(i j) in {0, 1} quad && i in I, j in J
+$
+
+Il primo vincolo è un semi-assegnamento, il terzo il legame fra le due famiglie di variabili. Gli ultimi due si possono riunire in uno solo, un vincolo per ufficio invece di uno per coppia:
+$ sum_(j in J) x_(i j) <= u_i y_i quad i in I $
+Se apro l'ufficio vale il limite $u_i$; se non lo apro, a destra c'è 0 e nessun cliente può andarci. Se gli uffici non avessero un limite, si otterrebbe lo stesso effetto con un $M$ grande a piacere, $sum_(j in J) x_(i j) <= M y_i$: è il *vincolo di big-M*, lo stesso $x <= M y$ dei costi di setup. Serve in generale a legare una variabile non binaria a una binaria.
+
+*Un grafo spazio-tempo con le probabilità*. Il Prof. Viaggioni è bloccato a una conferenza (Conf) per uno sciopero dei trasporti e deve tornare a casa. Descrive tutte le alternative con un *grafo spazio-tempo* $G = (N, A)$:
+- i *nodi* sono coppie (luogo, orario), a partire dalle $("Conf", t)$ per ogni orario $t$ in cui un mezzo dovrebbe partire dalla città della conferenza;
+- gli archi *viaggio* $((s_i, t_i), (s_j, t_j))$ sono le corse: partenza dal luogo $s_i$ all'orario $t_i$, arrivo al luogo $s_j != s_i$ all'orario $t_j > t_i$;
+- gli archi *attesa* restano nello stesso luogo, $s_i = s_j$ e $t_j > t_i$: stare fermi aspettando una coincidenza.
+
+Ogni arco ha un *costo* $c_(i j) >= 0$ (di solito 0 sulle attese, tranne quando serve un albergo) e una *probabilità* $p_(i j)$ di essere davvero percorribile ($< 1$ su un'attesa se la coincidenza è stretta o gli alberghi sono pieni). Il professore ha un budget $C$ e vuole che il viaggio riesca con probabilità almeno del 90%, cioè che tutti gli spostamenti scelti vadano a buon fine. Vuole minimizzare il tempo di viaggio, dall'effettiva partenza dalla conferenza all'effettivo arrivo a casa.
+
+Si aggiungono una *super-sorgente* $s$, collegata a tutti i nodi $("Conf", t)$, e una *super-destinazione* $d$, a cui sono collegati tutti i nodi $("casa", t)$. Su questi archi artificiali costo 0 e probabilità 1.
+
+#grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
+  rete((("s"): (-1.8, 1.2), ("C1"): (0, 2.4), ("C2"): (1.8, 2.4), ("L2"): (1.8, 1.2), ("L3"): (3.6, 1.2), ("H3"): (3.6, 0), ("H4"): (5.4, 0), ("d"): (7.2, 1.2)),
+    (("s", "C1"), ("s", "C2"), ("C1", "C2"), ("C1", "L2"), ("C2", "L3"), ("L2", "L3"), ("L2", "H3"), ("L3", "H4"), ("H3", "H4"), ("H3", "d"), ("H4", "d")),
+    evid: ("s-C1", "C1-L2", "L2-H3", "H3-d"), scala: 1,
+    note: (("C1"): ((0, 0.6), text(7pt)[(Conf, 1)]), ("C2"): ((0, 0.6), text(7pt)[(Conf, 2)]), ("L3"): ((0.95, 0.35), text(7pt)[(Lucca, 3)]), ("H4"): ((0, -0.6), text(7pt)[(casa, 4)]))),
+  [
+    Un luogo per riga (C la conferenza, L Lucca, H casa), il numero nel nodo è l'orario: il tempo scorre verso destra. Gli archi orizzontali sono attese, gli altri corse. In blu un cammino: parto dalla conferenza all'orario 1, cambio a Lucca, arrivo a casa all'orario 3.
+  ])
+
+*Variabili*: $x_(i j) in {0, 1}$ per ogni arco, vale 1 se il viaggio usa l'arco $(i, j)$ (il mezzo, o l'attesa della coincidenza).
+
+*Vincoli*. Le $x$ devono descrivere un cammino da $s$ a $d$: sono i vincoli di conservazione del flusso del cammino minimo (@flusso), con $b_s = -1$, $b_d = 1$ e 0 negli altri nodi. Il grafo non ha cicli, perché gli archi vanno solo avanti nel tempo. Il budget è come quello dello zaino: $sum_((i, j) in A) c_(i j) x_(i j) <= C$.
+
+*Funzione obiettivo*: tempo di viaggio = orario di arrivo − orario di partenza. L'arrivo è l'orario $t$ del nodo $("casa", t)$ da cui il cammino entra in $d$; la partenza quello del nodo $("Conf", t)$ in cui entra da $s$:
+$ min z = sum_(("casa", t) -> d) t thin x_(("casa", t), d) - sum_(s -> ("Conf", t)) t thin x_(s, ("Conf", t)) $
+
+Resta la probabilità. Il viaggio riesce se riescono tutti gli archi scelti, quindi la probabilità è il *prodotto*:
+$ product_((i, j) in A : x_(i j) = 1) p_(i j) >= 0.9 $
+Non è lineare: è un prodotto, e dipende da quali $x$ valgono 1.
+
+#base[logaritmo][
+Il logaritmo trasforma prodotti in somme, $log(a dot b) = log a + log b$, ed è *crescente*: se $a >= b$ allora $log a >= log b$, quindi applicato ai due lati non gira il verso di una disuguaglianza. Per $0 < p <= 1$ vale $log p <= 0$.
+]
+
+Applico il logaritmo ai due lati, poi la somma sugli archi scelti diventa una somma su tutti gli archi pesata con le $x$, come nello zaino:
+$ log(product_(x_(i j) = 1) p_(i j)) >= log 0.9 quad -> quad sum_(x_(i j) = 1) log p_(i j) >= log 0.9 quad -> quad sum_((i, j) in A) (log p_(i j)) x_(i j) >= log 0.9 $
+I $log p_(i j)$ sono numeri, calcolati sui dati: il vincolo è lineare.
+
+= Grafi e reti di flusso
+
+#obiettivi(
+  [portare un problema di flusso alla forma standard con le trasformazioni equivalenti;],
+  [dire se un problema di cammino minimo è vuoto o illimitato;],
+  [calcolare le etichette di un albero, controllare le condizioni di Bellman e dimostrare il teorema;],
+  [eseguire a mano Bellman-Ford (SPT.L) e Dijkstra (SPT.S), e sapere quale usare e quanto costano;],
+  [numerare topologicamente un grafo e trovare i cammini minimi su un grafo aciclico;],
+  [eseguire Kruskal e Prim, e spiegare in cosa Prim è diverso da Dijkstra.],
+)
+
+Molti problemi di ottimizzazione hanno la forma di un grafo: a volte è evidente (reti stradali, ferroviarie, di telecomunicazioni, idriche, elettriche), a volte nasce dal modo in cui si scrive il modello. Nel capitolo precedente i problemi su grafi li abbiamo solo *scritti*; qui li *risolviamo*, con algoritmi fatti apposta, a partire dai più semplici.
+
+== Reti di flusso e trasformazioni equivalenti <reti>
+
+Una *rete* è un grafo orientato pesato $G = (N, A)$, con $n = |N|$ nodi e $m = |A|$ archi. Sugli archi scorre un flusso, che può essere *discreto* (numero di auto, di messaggi) o *continuo* (petrolio in un oleodotto), e può essere un totale o una quantità per unità di tempo. Il modello è il flusso di costo minimo già visto (@flusso); qui si fissano i nomi che useranno gli algoritmi.
+
+- *Deficit*: $b_i > 0$ è un nodo di *domanda* (destinazione, pozzo): il bene esce dalla rete. $b_i < 0$ è un nodo di *offerta* (origine, sorgente): il bene entra nella rete. $b_i = 0$ è un nodo *di trasferimento* (il "transito" di prima). Con $D = {i : b_i > 0}$ e $O = {i : b_i < 0}$, la domanda totale è uguale all'offerta totale: $sum_(i in D) b_i = -sum_(i in O) b_i$, cioè $sum_(i in N) b_i = 0$.
+- *Arco* $(i, j)$: un *costo* $c_(i j)$ per unità di flusso, una *capacità inferiore* $l_(i j)$ (il minimo da trasportare) e una *capacità superiore* $u_(i j)$ (il massimo). Spesso $l_(i j) = 0$ e conta solo $u_(i j)$.
+- *Stelle*: $F S(i)$ (stella uscente, forward star) sono gli archi che escono da $i$, $B S(i)$ (stella entrante, backward star) quelli che entrano.
+
+Un vettore $x = (x_(i j))_((i, j) in A)$ è un *flusso* se rispetta la conservazione in ogni nodo, ed è un *flusso ammissibile* se rispetta anche le capacità:
+$ sum_((j, i) in B S(i)) x_(j i) - sum_((i, j) in F S(i)) x_(i j) = b_i quad forall i in N quad quad l_(i j) <= x_(i j) <= u_(i j) quad forall (i, j) in A $
+Il suo costo è $c(x) = sum_((i, j) in A) c_(i j) x_(i j)$; minimizzarlo è il problema di *flusso di costo minimo* (MCF). Quasi tutti i problemi del capitolo si riconducono a un MCF.
+
+*Trasformazioni equivalenti*. Gli algoritmi lavorano su una forma semplice del problema. Se l'istanza non la rispetta, se ne costruisce una *equivalente*: un'altra rete che ha le stesse soluzioni.
+
+#align(center, table(columns: 2,
+  [si assume], [se non è così],
+  [una sola sorgente e un solo pozzo], [sorgenti e pozzi multipli],
+  [capacità inferiori nulle], [capacità inferiori non nulle],
+  [nessuna capacità sui nodi], [limiti di capacità sui nodi],
+  [offerta = domanda], [eccesso di offerta o di domanda],
+))
+
+#let pos5 = (("1"): (0.9, 2.1), ("2"): (2.5, 2.9), ("3"): (0.7, 0.4), ("4"): (2.6, 0.2), ("5"): (4.4, 1.3))
+#let A5 = (("1", "2"), ("1", "4"), ("4", "2"), ("2", "5"), ("3", "4"), ("4", "5"))
+#let rosso5(t) = text(fill: red, t)
+
+*Sorgenti e pozzi multipli*. Si costruisce una *rete ampliata* $G' = (N', A')$ con due nodi fittizi, $N' = N union {s, t}$:
+- la *super sorgente* $s$ offre tutto, $b_s = sum_(j in O) b_j$, ed è collegata a ogni sorgente $j in O$ con un arco $(s, j)$ di costo 0 e capacità $u_(s j) = -b_j$;
+- il *super pozzo* $t$ chiede tutto, $b_t = sum_(i in D) b_i$, e ogni pozzo $i in D$ è collegato a lui con un arco $(i, t)$ di costo 0 e capacità $u_(i t) = b_i$;
+- tutti gli altri nodi diventano di trasferimento, $b_i = 0$.
+
+La capacità è il trucco: da $s$ verso $j$ non può passare più di quello che $j$ offriva, quindi ogni vecchia sorgente immette nella rete esattamente quanto prima.
+
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  rete(pos5, A5, scala: 0.95, note: (("1"): ((-0.95, 0.1), $b_1 = -4$), ("2"): ((0, 0.6), $b_2 = 1$), ("3"): ((-0.95, -0.2), $b_3 = -2$), ("4"): ((0, -0.6), $b_4 = 0$), ("5"): ((0.3, -0.6), $b_5 = 5$))),
+  text(18pt)[→],
+  rete(pos5 + (("s"): (-0.9, 1.2), ("t"): (5.8, 2.6)), A5 + (("s", "1"), ("s", "3"), ("2", "t"), ("5", "t")), scala: 0.95,
+    colori: ("s": rgb("#d4f0dd"), "t": rgb("#d4f0dd")),
+    etichette: ("s-1": rosso5($u = 4$), "s-3": rosso5($u = 2$), "2-t": rosso5($u = 1$), "5-t": rosso5($u = 5$)),
+    note: (("s"): ((0, -0.62), rosso5($b_s = -6$)), ("t"): ((0, 0.62), rosso5($b_t = 6$)), ("1"): ((-0.2, 0.6), rosso5($0$)), ("2"): ((0, 0.6), rosso5($0$)), ("3"): ((0, -0.6), rosso5($0$)), ("4"): ((0, -0.6), $0$), ("5"): ((0.3, -0.6), rosso5($0$)))),
+))
+Le sorgenti sono 1 e 3, i pozzi 2 e 5. A destra in rosso quello che cambia: i deficit vecchi vanno a 0, e le capacità degli archi nuovi sono i vecchi deficit.
+
+*Capacità inferiori non nulle*. Se l'arco $(i, j)$ deve portare almeno $l_(i j) != 0$, si immagina che $l_(i j)$ unità ci passino *sempre*, e si toglie dal problema solo la parte che resta da decidere. Il nuovo flusso è $x'_(i j) = x_(i j) - l_(i j)$, e si aggiornano i dati:
+- $b'_i = b_i + l_(i j)$: il nodo $i$ ha già spedito $l_(i j)$ unità;
+- $b'_j = b_j - l_(i j)$: il nodo $j$ le ha già ricevute;
+- $u'_(i j) = u_(i j) - l_(i j)$: sull'arco c'è meno spazio;
+- alla funzione obiettivo si aggiunge la costante $c_(i j) l_(i j)$, il costo di quelle unità fisse.
+
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  rete(pos5, A5, scala: 0.95, etichette: ("2-5": [$l = 2, u = 5$]), note: (("1"): ((-0.95, 0.1), $b_1 = -4$), ("2"): ((0, 0.6), $b_2 = 1$), ("3"): ((-0.95, -0.2), $b_3 = -2$), ("4"): ((0, -0.6), $b_4 = 0$), ("5"): ((0.3, -0.6), $b_5 = 5$))),
+  text(18pt)[→],
+  rete(pos5, A5, scala: 0.95, etichette: ("2-5": rosso5($u = 5 - 2 = 3$)), note: (("1"): ((-0.95, 0.1), $b_1 = -4$), ("2"): ((0, 0.6), rosso5($b_2 = 1 + 2 = 3$)), ("3"): ((-0.95, -0.2), $b_3 = -2$), ("4"): ((0, -0.6), $b_4 = 0$), ("5"): ((0.3, -0.6), rosso5($b_5 = 5 - 2 = 3$)))),
+))
+Sull'arco $(2, 5)$, di costo $c_(2 5) = 1$, passano almeno 2 unità: il 2 deve far arrivare al 5 due unità in più, e il problema nuovo ha un costo fisso di $c_(2 5) l_(2 5) = 2$.
+
+*Limiti di capacità sui nodi*. Un nodo $i$ può avere una capacità massima $u_i$ (non ci passano più di $u_i$ unità) e/o minima $l_i$. Il modello standard non li sa scrivere, ma li sa scrivere su un arco: si *sdoppia* il nodo in un nodo di ingresso $i'$ e uno di uscita $i''$. Gli archi che entravano in $i$ entrano in $i'$, quelli che uscivano da $i$ escono da $i''$, e si aggiunge l'arco fittizio $(i', i'')$ con costo 0 e capacità $[l_i, u_i]$. Tutto quello che passa per il nodo passa per quell'arco.
+
+#let pos7 = (("1"): (0, 2), ("2"): (0, 1), ("3"): (0, 0), ("4"): (1.6, 1), ("5"): (3.2, 2), ("6"): (3.2, 1), ("7"): (3.2, 0))
+#let pos7b = (("1"): (0, 2), ("2"): (0, 1), ("3"): (0, 0), ("4'"): (1.4, 1), ("4''"): (3.0, 1), ("5"): (4.4, 2), ("6"): (4.4, 1), ("7"): (4.4, 0))
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  rete(pos7, (("1", "4"), ("2", "4"), ("3", "4"), ("4", "5"), ("4", "6"), ("4", "7")), scala: 0.95, note: (("4"): ((0, 0.65), [$l_4 = 2, u_4 = 6$]),)),
+  text(18pt)[→],
+  rete(pos7b, (("1", "4'"), ("2", "4'"), ("3", "4'"), ("4'", "4''"), ("4''", "5"), ("4''", "6"), ("4''", "7")), scala: 0.95, evid: ("4'-4''",),
+    etichette: ("4'-4''": [$[2, 6]$])),
+))
+
+*Eccesso di offerta (o di domanda)*. A volte quello che una sorgente $i in O$ offre è un *massimo*, non una quantità da mandare tutta nella rete: l'offerta totale supera la domanda. La conservazione nelle sorgenti diventa una disuguaglianza, $sum_(B S(i)) x_(j i) - sum_(F S(i)) x_(i j) >= b_i$ per $i in O$, con $b_i < 0$ l'offerta massima. Per tornare a un'uguaglianza si aggiunge una sorgente fittizia $s$ che offre esattamente la domanda, $b_s = -sum_(j in D) b_j$; le vecchie sorgenti diventano di trasferimento ($b_i = 0$) e ricevono da $s$ con un arco $(s, i)$ di costo 0 e capacità $u_(s i) = -b_i$. Per l'eccesso di domanda, al contrario, si aggiunge un pozzo fittizio.
+
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  rete(pos5, A5, scala: 0.95, note: (("1"): ((-0.95, 0.1), $b_1 = -4$), ("2"): ((0, 0.6), $b_2 = 2$), ("3"): ((-0.95, -0.2), $b_3 = -6$), ("4"): ((0, -0.6), $b_4 = 0$), ("5"): ((0.3, -0.6), $b_5 = 5$))),
+  text(18pt)[→],
+  rete(pos5 + (("s"): (-0.9, 1.2),), A5 + (("s", "1"), ("s", "3")), scala: 0.95, colori: ("s": rgb("#d4f0dd"),),
+    etichette: ("s-1": rosso5($u = 4$), "s-3": rosso5($u = 6$)),
+    note: (("s"): ((0, -0.62), rosso5($b_s = -7$)), ("1"): ((-0.2, 0.6), rosso5($0$)), ("2"): ((0, 0.6), $b_2 = 2$), ("3"): ((0, -0.6), rosso5($0$)), ("4"): ((0, -0.6), $0$), ("5"): ((0.3, -0.6), $b_5 = 5$))),
+))
+Le sorgenti potrebbero dare $4 + 6 = 10$, ma i pozzi chiedono solo $2 + 5 = 7$. La sorgente fittizia immette 7, e ogni vecchia sorgente ne riceve al più quanto poteva offrire.
+
+== Cammini minimi: il problema e le condizioni di Bellman <cammini>
+
+È uno dei problemi più semplici e più importanti sulle reti: lo risolvono i navigatori GPS, Google Maps, le app del trasporto pubblico, su grafi con milioni di nodi e in tempi brevissimi.
+
+#definizione[cammino minimo][Su un grafo orientato $G = (N, A)$, $N = {1, dots, n}$, ogni arco $(i, j)$ ha un costo $c_(i j) in RR$ (anche negativo). Un *cammino* $P$ è una sequenza di archi che collega due nodi, e costa $C(P) = sum_((i, j) in P) c_(i j)$. Dati un'origine $r$ e una destinazione $t$, con $cal(P)_(r t)$ l'insieme dei cammini da $r$ a $t$, il problema è
+$ ("SP") quad min { C(P) : P in cal(P)_(r t) } $]
+
+Come modello è un flusso di costo minimo (@flusso): $b_r = -1$, $b_t = 1$, $b_i = 0$ negli altri nodi, capacità infinite. Se ci sono più cammini ottimi il flusso si può dividere fra loro, e per avere un cammino solo serve il vincolo di interezza $x in {0, 1}^m$; gli algoritmi che vedremo però restituiscono comunque soluzioni intere.
+
+Prima di cercare il minimo, due cose possono andare storte: il problema può essere *vuoto* o *illimitato*. In tutto il capitolo si usa questo grafo d'esempio (a volte con qualche arco cambiato); i numeri sugli archi sono i costi.
+
+#align(center, disegna(A10))
+
+*Vuoto: nessun cammino*. Se da $r$ non si arriva a $t$, (SP) non ha soluzioni. Lo si scopre con una *visita* del grafo. Per ogni nodo si tiene l'*etichetta del predecessore* $p_j$: da quale nodo ci sono arrivato ($-1$ = mai raggiunto). Si parte con $Q = {r}$, la lista dei nodi da visitare; finché $Q$ non è vuota se ne toglie il primo nodo $i$, e ogni nodo $j$ raggiungibile con un arco $(i, j)$ e mai raggiunto prima prende $p_j = i$ ed entra in fondo a $Q$.
+
+#let vis = visita(10, A10vuoto, 1)
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna(A10vuoto, colore: orange, evid: range(2, 11).filter(k => vis.p.at(k) > 0).map(k => str(vis.p.at(k)) + "-" + str(k)),
+    sopra: range(2, 11).map(k => (str(k), $#vis.p.at(k)$)).to-dict()),
+  table(columns: 3, align: (center, left, left), inset: 4pt,
+    [tolgo], [nuovi raggiunti], [$Q$ dopo],
+    ..vis.passi.map(((i, nuovi, Q)) => ([#i], if nuovi.len() == 0 [—] else { nuovi.map(j => $p_#j = #i$).join([, ]) }, insieme(Q))).flatten()))
+
+Qui alcuni archi sono girati rispetto al grafo d'esempio: in 5 si entra e basta. Le etichette arancioni sono i $p_j$ alla fine, in blu gli archi della visita. I nodi 7, 8, 9 e 10 restano a $-1$: da 1 non si arriva a 9, e il problema da 1 a 9 è vuoto. Una visita guarda ogni arco una volta sola, quindi costa $O(m)$ (se il grafo è descritto per stelle uscenti).
+
+*Illimitato: un ciclo negativo*. Può esistere un cammino ma non un cammino *minimo*. Nel grafo d'esempio metto $c_(5 8) = -3$: il ciclo $5 -> 8 -> 6 -> 5$ costa $-3 + 1 + 1 = -1$.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna(A10neg, evid: ("5-8", "8-6", "6-5")),
+  [
+    Un cammino da 1 a 9 può passare da 5, fare il giro del ciclo e tornare in 5 avendo speso 1 in meno. Ogni giro in più toglie un'altra unità: il costo scende senza fine, e il problema è *inferiormente illimitato* (il minimo è $-infinity$).
+  ])
+
+#teorema[Illimitatezza][Un problema di cammino minimo è inferiormente illimitato $<==>$ esiste un ciclo orientato di costo negativo *raggiungibile dall'origine* e *dal quale si può raggiungere la destinazione*.]
+
+Non basta che il ciclo esista: se il cammino non lo può toccare, "lo guarda da lontano" e la soluzione c'è lo stesso. Se esiste un ciclo negativo lo si può scoprire in tempo polinomiale (vedremo come).
+
+Un cammino che passa due volte per lo stesso nodo contiene un ciclo: si dice *non semplice*. Senza cicli negativi c'è sempre una soluzione ottima *semplice*, perché togliere un ciclo non negativo non peggiora il costo. Con i cicli negativi, invece, cercare il cammino *semplice* di costo minimo è *NP-arduo*: almeno difficile quanto ogni problema in NP, e nessun algoritmo noto lo risolve in tempo polinomiale. Non è un problema "semplice", e qui non si affronta.
+
+Una condizione *sufficiente ma non necessaria* per non avere cicli negativi è che tutti i costi siano $>= 0$. Si possono avere costi negativi senza cicli negativi: con $c_(1 2) = -1$ nel grafo d'esempio non cambia niente, perché in 1 non entra nessun arco e quindi l'arco $(1, 2)$ non sta in nessun ciclo.
+
+*Dal cammino all'albero*. Se il cammino minimo da 1 a 6 è $1 -> 2 -> 4 -> 6$, allora $1 -> 2 -> 4$ è il cammino minimo da 1 a 4, e $1 -> 2$ quello da 1 a 2: *ogni pezzo di un cammino minimo è minimo*. Se ci fosse un cammino migliore da 1 a 4, sostituendolo si otterrebbe un cammino migliore anche da 1 a 6. Quindi calcolare un cammino minimo vuol dire calcolarne tanti insieme, e conviene cercarli *tutti*: i cammini minimi dalla radice $r$ a ogni altro nodo.
+
+#definizione[albero dei cammini minimi (SPT)][Data una radice $r$, il problema è trovare un cammino minimo $P_i$ da $r$ a ogni nodo $i != r$, cioè $min { sum_(i != r) C(P_i) : P_i in cal(P)_(r i) }$. L'unione dei $P_i$ si può sempre prendere come un *albero radicato in $r$* (Shortest Path Tree, SPT): ogni arco è orientato da $r$ verso le foglie, entra in ogni nodo $i != r$ un solo arco, e gli archi sono $n - 1$. Il cammino dell'albero da $r$ a un nodo intermedio è a sua volta minimo.]
+
+Per descrivere tutti i cammini bastano quindi $n - 1$ informazioni: per ogni nodo, il suo *predecessore* $p_i$ nell'albero. Anche l'SPT è un flusso di costo minimo: la radice è una sorgente che manda un'unità a ciascun altro nodo, $b_r = -(n - 1)$, e ogni nodo $i != r$ è un pozzo con $b_i = 1$; $x_(i j)$ conta quanti cammini usano l'arco. Senza cicli negativi questo problema ha un ottimo finito.
+
+Un nodo $i$ non raggiungibile da $r$ farebbe fallire tutto. Si aggiunge allora un arco fittizio $(r, i)$ con costo $M = (n - 1) c_max + 1$, dove $c_max$ è il costo più alto: più di qualunque cammino vero (un cammino semplice ha al più $n - 1$ archi). Il cammino minimo verso $i$ usa quell'arco *solo se* non esistono cammini reali.
+
+*Verificare un albero: le etichette*. Una visita costruisce un albero radicato in $r$ che raggiunge tutti i nodi. Basta tenere conto, mentre si visita, di quanto costa arrivare a ogni nodo:
+
+#definizione[etichette di un albero][Dato un albero $T = (N, A_T)$ radicato in $r$, $d_i$ è il costo del cammino da $r$ a $i$ *nell'albero*, $d_i = C(P^T_i)$, con $d_r = 0$. Su ogni arco $(i, j)$ dell'albero vale $d_i + c_(i j) = d_j$.]
+
+#let vv = visita(10, A10, 1)
+#let fix = correggi(10, A10, 1, vv.p)
+#let d0 = lungo-albero(10, A10, 1, vv.p)
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna(A10, evid: albero(d0, vv.p, 1), sopra: etichette-d(d0)),
+  [
+    L'albero della visita sul grafo d'esempio (in blu), con le etichette $d$ nei riquadri verdi: per arrivare in 7 passo da 3 e 5, e pago $5 + 5 + 5 = 15$.
+
+    È l'albero dei cammini minimi? No: arrivare in 4 passando da 2 costa $d_2 + c_(2 4) = 1 + 1 = 2$, meno di $d_4 = 3$.
+  ])
+
+In generale, per ogni arco $(i, j)$ *fuori* dall'albero si controlla se $d_i + c_(i j) < d_j$: se sì, passando da $i$ si arriva in $j$ spendendo meno, e l'albero non è ottimo. Si sostituisce l'arco che entrava in $j$ con $(i, j)$, e l'etichetta di $j$ cala, *a cascata* insieme a quelle di tutti i nodi che nell'albero stanno sotto $j$. Ecco un giro sugli archi fuori dall'albero, in ordine:
+
+#align(center, table(columns: 5, align: (center, center, center, center, left), inset: 4pt,
+  [arco $(i, j)$], [$d_i + c_(i j)$], [$d_j$], [migliora?], [etichette che cambiano],
+  ..fix.righe.map(((i, j, nuovo, vecchio, viola, cambi)) => ($(#i, #j)$, $#nuovo$, $#vecchio$, if viola { si } else { no }, cambi-d(cambi))).flatten()))
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna(A10, evid: albero(fix.d, fix.p, 1), sopra: etichette-d(fix.d)),
+  [
+    L'albero alla fine. Ora #if fix.ottimo [nessun arco] else [qualche arco] del grafo ha $d_i + c_(i j) < d_j$: non si può migliorare niente, e il teorema che segue dice che è l'albero dei cammini minimi.
+  ])
+
+#definizione[condizioni di Bellman][Un vettore di etichette $d$ verifica le condizioni di Bellman se
+$ d_i + c_(i j) >= d_j quad forall (i, j) in A, quad quad d_r = 0 $
+Sugli archi dell'albero vale con l'uguale, sugli altri dice che passare da quell'arco non conviene.]
+
+#teorema[Teorema di Bellman][Un albero $T = (N, A_T)$ radicato in $r$ è un albero dei cammini minimi $<==>$ il suo vettore di etichette $d$ verifica le condizioni di Bellman.]
+
+*Dimostrazione di $==>$*, per assurdo. Sia $T$ un albero dei cammini minimi, e supponiamo che una condizione sia violata: per un arco $(i, j)$ vale $d_i + c_(i j) < d_j$.
++ $d_i$ è il costo di un cammino da $r$ a $i$; aggiungendo l'arco $(i, j)$ ottengo un cammino da $r$ a $j$ che costa $d_i + c_(i j)$.
++ Questo costa meno di $d_j$, il cammino dell'albero verso $j$: quindi quello non è minimo.
++ Allora $T$ non è un albero dei cammini minimi: assurdo.
+
+Per l'altra direzione serve un lemma.
+
+#teorema[Lemma di Bellman][Se $d$ verifica le condizioni di Bellman, allora per ogni nodo $i != r$ e per *ogni* cammino $P$ da $r$ a $i$ nel grafo (anche non semplice): $d_i <= C(P)$.]
+
+*Dimostrazione*. Sia $P$ fatto degli archi $(i_1, i_2), (i_2, i_3), dots, (i_(k-1), i_k)$, con $i_1 = r$ e $i_k = i$.
++ Scrivo la condizione di Bellman per ogni arco di $P$: $d_(i_1) + c_(i_1 i_2) >= d_(i_2)$, $quad d_(i_2) + c_(i_2 i_3) >= d_(i_3)$, $quad dots, quad d_(i_(k-1)) + c_(i_(k-1) i_k) >= d_(i_k)$.
++ Sommo tutte le disuguaglianze (sommando, il verso resta). Ogni $d$ intermedio compare a sinistra e a destra e si cancella: resta $d_(i_1) + C(P) >= d_(i_k)$.
++ Con $d_(i_1) = d_r = 0$ e $i_k = i$: $C(P) >= d_i$.
+
+*Dimostrazione di $<==$*. Se $d$ verifica le condizioni di Bellman, per il lemma nessun cammino verso $i$ costa meno di $d_i$. Ma $d_i$ è il costo del cammino dell'albero verso $i$: quel cammino è minimo, per ogni $i$. Quindi $T$ è un albero dei cammini minimi.
+
+#nota[*Il costo dell'albero dei cammini minimi* è la somma dei costi dei cammini, cioè la *somma delle etichette* $sum_i d_i$, non la somma dei costi dei suoi archi: un arco vicino alla radice sta in molti cammini e va contato ogni volta. Nell'esempio la somma delle etichette fa #fix.d.slice(1).sum(), quella degli archi dell'albero solo #range(2, 11).map(k => A10.find(e => e.at(0) == fix.p.at(k) and e.at(1) == k).at(2)).sum(). Il prof avverte: è una domanda tipica dei compiti, e spesso viene sbagliata.]
+
+== Algoritmi per l'albero dei cammini minimi: Bellman-Ford e Dijkstra <spt>
+
+Visitare il grafo e poi correggere l'albero arco per arco funziona, ma costringe a molte visite. Conviene correggere le etichette *mentre* si visita: è l'*algoritmo SPT*. Riceve il grafo $G$, i costi $c$ e la radice $r$, e restituisce le etichette dei predecessori $p$ e dei costi $d$.
+
+```
+procedure (p, d) = SPT(G, c, r)
+  foreach (i in N) do { p[i] = r; d[i] = M; }   // inizializzazione
+  d[r] = 0;  Q = { r };
+  do {
+    select i from Q;  Q = Q \ { i };
+    foreach ((i, j) in FS(i)) do
+      if (d[i] + c[i][j] < d[j]) then {           // (i, j) viola Bellman
+        d[j] = d[i] + c[i][j];  p[j] = i;
+        Q = Q ∪ { j };
+      }
+  } while (Q ≠ ∅);
+```
+
+#align(center, table(columns: 2, align: (left, left),
+  [riga], [cosa fa],
+  [`p[i] = r; d[i] = M`], [ogni nodo "arriva dalla radice" con costo $M$ grande: è come aggiungere gli archi fittizi $(r, i)$ di costo $M$. Se alla fine un nodo ha ancora $d_i = M$, non era raggiungibile],
+  [`d[r] = 0; Q = {r}`], [arrivare in $r$ costa 0 (come un arco $(r, r)$ di costo 0); in $Q$, la lista dei nodi da esaminare, c'è solo $r$],
+  [`select i from Q`], [tolgo un nodo da $Q$; *quale* nodo scelgo è ciò che distingue gli algoritmi],
+  [`foreach (i, j) in FS(i)`], [guardo tutti gli archi che escono da $i$],
+  [`if d[i] + c[i][j] < d[j]`], [l'arco viola la condizione di Bellman: passando da $i$ arrivo in $j$ spendendo meno],
+  [`d[j] = …; p[j] = i`], [aggiorno costo e predecessore di $j$: ora ci arrivo da $i$],
+  [`Q = Q ∪ {j}`], [l'etichetta di $j$ è cambiata, quindi i suoi archi uscenti vanno ricontrollati: $j$ entra in $Q$ (se c'è già, resta dov'è)],
+  [`while Q ≠ ∅`], [quando $Q$ è vuota nessun arco viola più Bellman: per il teorema l'albero è ottimo],
+))
+
+*SPT.L.Queue: l'algoritmo di Bellman-Ford*. La scelta più semplice: $Q$ è una *fila* (FIFO, first in first out), si estrae sempre il primo e i nuovi entrano in fondo. L'algoritmo si chiama SPT.L.Queue (L perché $Q$ è una lista, Queue perché è una fila) o *algoritmo di Bellman-Ford*. Sul grafo d'esempio con radice 1, guardando gli archi uscenti in ordine di nodo d'arrivo:
+
+#let bf = spt(10, A10, 1, fila)
+#align(center, traccia(bf.passi))
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna(A10, evid: albero(bf.d, bf.p, 1), sopra: etichette-d(bf.d)),
+  [
+    Il risultato: in blu l'albero dei cammini minimi (l'arco blu che entra in $j$ viene da $p_j$), nei riquadri le etichette $d$. Gli archi grigi rispettano tutti Bellman.
+  ])
+
+Lo stesso nodo può *rientrare* in $Q$ più volte: 3 rientra quando da 4 si scopre una strada migliore, e ogni volta che un'etichetta cala devono essere ricontrollati anche i nodi che vengono dopo. L'algoritmo termina sempre?
+
+#teorema[Cicli negativi e Bellman][Se esiste un ciclo orientato di costo negativo, *nessun* vettore $d$ verifica le condizioni di Bellman.]
+
+*Dimostrazione*, per assurdo. Sia $L = (i_1, i_2, dots, i_k, i_1)$ un ciclo con $C(L) < 0$, e supponiamo che $d$ verifichi Bellman.
++ Scrivo la condizione per ogni arco del ciclo: $d_(i_1) + c_(i_1 i_2) >= d_(i_2)$, $quad dots, quad d_(i_k) + c_(i_k i_1) >= d_(i_1)$.
++ Sommo: questa volta *tutte* le $d$ compaiono una volta per lato, perché il ciclo torna al nodo di partenza, e si cancellano. Resta $0 <= C(L)$.
++ Ma $C(L) < 0$: contraddizione. Con un ciclo negativo il problema non ha soluzione finita.
+
+#let neg = spt(10, A10neg, 1, fila, max: 40)
+Quindi, per l'algoritmo:
+- se c'è un ciclo negativo *raggiungibile da $r$*, l'algoritmo *non termina*: le etichette del ciclo continuano a scendere. Sul grafo con $c_(5 8) = -3$, l'etichetta di 8 nelle prime #neg.passi.len() estrazioni vale via via #neg.passi.map(((i, c, Q)) => c.filter(((j, v)) => j == 8).map(((j, v)) => v)).flatten().map(v => $#v$).join([, ]), …;
+- se c'è un ciclo negativo *non raggiungibile da $r$*, l'algoritmo termina e dà l'albero dei cammini minimi dei soli nodi raggiungibili;
+- se non ci sono cicli negativi, l'algoritmo termina.
+
+L'ultimo punto si vede così:
++ in ogni momento ogni etichetta $d_i < M$ è il costo di un cammino vero da $r$ a $i$ (non per forza il minimo);
++ a ogni passo le etichette non aumentano mai: o calano o restano uguali;
++ senza cicli negativi un'etichetta non può calare all'infinito, perché i cammini da cui viene, tolti i cicli, sono finiti;
++ quindi dopo un numero finito di passi le etichette arrivano al costo dei cammini minimi e $Q$ si svuota.
+
+Con $Q$ gestita come fila si può dire di più:
+
+#teorema[Proprietà della fila][Se non esistono cicli orientati di costo negativo e $Q$ è una fila (FIFO), nessun nodo entra in $Q$ più di $n - 1$ volte.]
+
+La fila visita il grafo "a ventaglio": prima i nodi a un arco dalla radice, poi quelli a due archi, e così via. Quando un nodo rientra in $Q$ è perché ha trovato un cammino che costa meno ma ha *più archi*. Un cammino semplice ha al più $n - 1$ archi, quindi gli aggiornamenti di un nodo sono al più $n - 1$.
+
+Da qui due conseguenze:
+- *complessità $O(n m)$*: ogni nodo esce da $Q$ al più $n - 1$ volte, e ogni volta guarda i suoi archi uscenti; su tutti i nodi sono al più $m$ archi per giro. È polinomiale, ma su un grafo *denso* ($m approx n^2$) diventa $O(n^3)$: poco efficiente;
+- *si scoprono i cicli negativi*: si conta quante volte ogni nodo entra in $Q$. Se un nodo ci entra $n$ volte, c'è un ciclo negativo raggiungibile: ci si ferma e si dichiara il problema illimitato.
+
+#nota[*Altre code* (il prof le ha date solo come idea, non le chiede). Con la fila si formano dei "treni" di aggiornamenti: quando un'etichetta cala, tutti i nodi dopo di lui rientrano in coda. Altre regole provano a evitarlo:
+- *Dequeue* (coda a due uscite): si estrae dalla testa; un nodo mai visto ($d = M$) entra in fondo, uno già visto ($d < M$) entra in *testa*, perché i nodi dopo di lui vanno aggiornati subito. Complessità teorica $O(n 2^n)$, ma in pratica è più veloce. Perde il controllo dei cicli negativi, che dipendeva dalla fila: si usa quando si sa che non ce ne sono;
+- *LIFO*: l'ultimo entrato è il primo a uscire, $O(n 2^n)$;
+- *2-queue*: due code, una prioritaria per i nodi già visti ($d < M$) e una per quelli nuovi; si svuota prima la prioritaria. $O(n m^2)$;
+- *Threshold*: una soglia $T$; nella coda prioritaria i nodi con $d_i <= T$, nell'altra quelli con $d_i > T$. Con un buon $T$ è molto efficiente.]
+
+*SPT.S: l'algoritmo di Dijkstra*. Perché non scegliere direttamente in base alle etichette? Si estrae da $Q$ il nodo con l'*etichetta più piccola* (a parità, quello col nome più piccolo). È l'*algoritmo di Dijkstra*, o SPT.S (S per Shortest-first). Stesso grafo, stessa radice:
+
+#let dj = spt(10, A10, 1, piu-piccola)
+#align(center, traccia(dj.passi))
+
+Stesse etichette di Bellman-Ford, #if dj.d == bf.d [identiche] else [diverse], ma in #dj.passi.len() estrazioni invece di #bf.passi.len(): *ogni nodo esce da $Q$ una volta sola*.
+
+#teorema[Teorema di Dijkstra][Se tutti i costi sono non negativi, ogni nodo viene inserito ed estratto da $Q$ *al più una volta*. ("Al più" perché un nodo non raggiungibile non entra mai.)]
+
+Serve un lemma: *con costi non negativi le etichette dei nodi estratti, nell'ordine in cui escono, non decrescono*. Se $d^k_(i_k)$ è l'etichetta del nodo $i_k$ estratto al passo $k$, allora $d^1_(i_1) <= d^2_(i_2) <= dots <= d^n_(i_n)$. Infatti si estrae sempre la più piccola, e i nodi aggiornati dopo ricevono $d_i + c_(i j) >= d_i$.
+
+*Dimostrazione*, per assurdo. Supponiamo che un nodo $i$ esca due volte: al passo $k$ con etichetta $d^k_i$ e al passo $h > k$ con $d^h_i$.
++ Per rientrare in $Q$, la sua etichetta deve essere calata: $d^h_i < d^k_i$.
++ Ma per il lemma le etichette estratte non decrescono: $d^k_i <= d^h_i$.
++ Le due cose non possono valere insieme: assurdo.
+
+Quindi, con costi $>= 0$, *quando un nodo esce da $Q$ la sua etichetta è definitiva*: è già il costo del cammino minimo.
+
+*Complessità di Dijkstra*, con costi $c_(i j) >= 0$:
+- ogni nodo è estratto una volta sola: $n$ estrazioni;
+- ogni arco è guardato una volta sola, quando esce il suo nodo di partenza: $m$ in tutto;
+- ogni estrazione cerca il minimo in $Q$, $i = op("argmin"){d_j : j in Q}$, e senza altri accorgimenti costa $O(n)$, perché $Q$ ha al più $n$ nodi.
+
+In totale $O(n^2 + m) = O(n^2)$, perché $m <= n^2$. Questo vale se non ci sono *archi paralleli* (due archi con stessi estremi e stesso verso); se ci sono, basta tenere quello che costa meno.
+
+#align(center, grid(columns: 3, column-gutter: 1.2em, align: horizon,
+  canvas(length: 0.8cm, {
+    import draw: *
+    bezier((0.3, 0.15), (2.7, 0.15), (1.5, 1.1), stroke: 0.8pt + grigio, mark: (end: "stealth", fill: grigio))
+    bezier((0.3, -0.15), (2.7, -0.15), (1.5, -1.1), stroke: 0.8pt + grigio, mark: (end: "stealth", fill: grigio))
+    content((1.5, 0.9), text(7pt)[7])
+    content((1.5, -0.9), text(7pt)[1])
+    for (p, t) in (((0, 0), [1]), ((3, 0), [3])) { circle(p, radius: 0.3, fill: white, stroke: 0.7pt); content(p, text(8pt, t)) }
+  }),
+  text(16pt)[→],
+  rete((("1"): (0, 0), ("3"): (3, 0)), (("1", "3"),), etichette: ("1-3": $1$), scala: 0.8),
+))
+
+Bellman-Ford costa $O(n m)$: su un grafo denso ($m approx n^2$) fa $O(n^3)$, e Dijkstra con $O(n^2)$ è meglio. Su un grafo *sparso* ($m approx n$) Dijkstra migliora ancora tenendo $Q$ in un *heap binario*, una struttura che dà il minimo in $O(log n)$. Le $n$ estrazioni e gli $m$ aggiornamenti costano $O(log n)$ ciascuno: $O(n log n + m log n) = O(m log n)$, meglio di $O(n^2)$ sui grafi sparsi.
+
+#align(center, table(columns: 3, align: (left, center, left),
+  [], [complessità], [quando],
+  [Dijkstra (SPT.S), min per scansione], $O(n^2)$, [costi $>= 0$, grafo denso],
+  [Dijkstra (SPT.S) con heap], $O(m log n)$, [costi $>= 0$, grafo sparso],
+  [Bellman-Ford (SPT.L, fila)], $O(n m)$, [ci sono costi negativi: scopre anche i cicli negativi],
+))
+
+#nota[*Dijkstra con costi negativi*: il teorema non vale più, i nodi possono rientrare in $Q$ e la complessità può diventare esponenziale; con un ciclo negativo Dijkstra non termina. Siccome guardando il grafo non si sa se un ciclo negativo c'è, con costi negativi si usa Bellman-Ford.]
+
+Poiché in Dijkstra l'etichetta di un nodo è definitiva appena il nodo esce da $Q$, l'algoritmo serve anche quando interessa il cammino minimo verso *un solo* nodo $t$: ci si ferma appena $t$ esce, senza esplorare il resto del grafo. Allo stesso modo, per un *sottoinsieme di destinazioni* $S subset.eq N without {r}$ ci si ferma quando sono usciti tutti i nodi di $S$.
+
+*Radici multiple*. Se si vuole il cammino minimo verso $t$ partendo da *una qualunque* delle sorgenti $R = {r_1, dots, r_k}$, si aggiunge una radice fittizia $r_0$ collegata a ogni $r_i$ con un arco di costo 0, $c_(r_0 r_i) = 0$, e si calcolano i cammini minimi da $r_0$, fermandosi quando esce $t$. Più semplicemente, si parte con tutte le $r_i$ in $Q$ ed etichetta 0.
+
+== Cammini minimi su grafi aciclici <aciclici>
+
+Dijkstra è il più efficiente, ma solo senza costi negativi, perché i costi negativi possono creare cicli negativi. Se il grafo *non ha cicli*, il problema non si pone, e si può fare ancora meglio. Come si capisce se un grafo è aciclico?
+
+#teorema[Numerazione topologica][Un grafo orientato è aciclico $<==>$ esiste una *numerazione topologica* dei nodi: si possono numerare $1, 2, dots, n$ in modo che per ogni arco $(i, j) in A$ valga $i < j$.]
+
+Con un ciclo nessuna numerazione funziona: seguendo il ciclo i numeri dovrebbero crescere sempre, e poi tornare al primo. La numerazione si costruisce a passi:
++ si prende un nodo che *non ha archi entranti* e gli si dà il primo numero non ancora usato (se ce ne sono più d'uno, qui quello col nome più piccolo);
++ si cancellano i suoi archi uscenti, e si torna al passo 1.
+
+Se a un certo punto nessun nodo rimasto è privo di archi entranti, il grafo ha un ciclo. Il prof avverte che una domanda frequente è "questa numerazione è topologica? sì o no".
+
+#let ord = numera(10, A10aciclico)
+#let nuovo(k) = ord.position(x => x == k) + 1
+#let Aac = rinumera(A10aciclico, ord)
+#let posac = range(1, 11).map(k => (str(nuovo(k)), pos10.at(str(k)))).to-dict()
+Esempio: il grafo d'esempio con l'arco $(6, 8)$ al posto di $(8, 6)$. Nel grafo originale, invece, il ciclo $5 -> 8 -> 6 -> 5$ blocca la numerazione dopo #numera(10, A10).len() nodi.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna(A10aciclico, colore: orange, sopra: range(1, 11).map(k => (str(k), $#nuovo(k)$)).to-dict()),
+  [
+    Nei riquadri arancioni il numero topologico di ogni nodo. L'ordine in cui i nodi vengono numerati: #ord.map(k => $#k$).join($,$).
+
+    In 1 non entra niente: prende il numero 1. Cancellati i suoi archi, l'unico nodo senza archi entranti è 2, poi 4; a quel punto sono liberi sia 3 sia 6, e si prende 3.
+  ])
+
+Una volta numerati i nodi, l'ordine in cui esaminarli è già deciso: *SPT.Acyclic* prende i nodi in ordine $1, 2, dots, n$ e per ognuno controlla gli archi uscenti come nell'algoritmo SPT. Non serve la coda: quando si arriva al nodo $i$, tutti gli archi che entrano in $i$ vengono da nodi con numero più piccolo, già esaminati, quindi $d_i$ è già definitiva. Ogni arco è guardato una volta: $O(m)$, e anche la numerazione costa $O(m)$.
+
+Qui sotto lo stesso grafo con i nodi rinominati col loro numero topologico (ora ogni arco va da un numero più piccolo a uno più grande), radice 1:
+
+#let ac = spt-aciclico(10, Aac)
+#align(center, table(columns: 2, align: (center, left), inset: 4pt,
+  [esamino $i$], [archi $(i, j)$ che migliorano → nuova $d_j$],
+  ..ac.passi.map(((i, cambi)) => ([#i], cambi-d(cambi))).flatten()))
+
+#align(center, disegna(Aac, pos: posac, evid: albero(ac.d, ac.p, 1), sopra: etichette-d(ac.d)))
+
+Senza cicli si possono fare altre cose:
+- *costi negativi*: su un grafo aciclico non ci sono cicli negativi, quindi SPT.Acyclic funziona anche con costi negativi, sempre in $O(m)$;
+- *cammini di costo massimo*: si moltiplicano per $-1$ i costi di tutti gli archi e si cercano i cammini minimi;
+- *altre radici*: per l'albero da un'altra radice basta considerare i nodi dal numero della radice in avanti (gli altri non si raggiungono).
+
+== Albero di copertura di costo minimo <mst-alg>
+
+Il problema l'abbiamo già modellato (@mst-modello), e il prof avverte che la formulazione la può chiedere. Dato un grafo *non orientato* $G = (V, E)$ con costi $c_(i j)$ sui lati, si cerca un *albero di copertura* $T = (V, E_T)$, cioè un sottografo con $n - 1$ lati, connesso e senza cicli, di costo minimo $c(T) = sum_({i, j} in E_T) c_(i j)$.
+
+È uno dei pochi problemi di ottimizzazione che si risolvono all'ottimo con un algoritmo *greedy* ("goloso": a ogni passo fa la scelta che sembra migliore in quel momento, e non torna indietro). Somiglia al problema dell'SPT, anche se è su grafi non orientati, e serve per le reti elettriche e di telecomunicazioni.
+
+Si assume che $G$ sia *connesso* e che tutti i costi siano *positivi*. Se $G$ non è connesso l'albero di copertura non esiste, e si parla di *foresta* di copertura di costo minimo: si aggiungono lati fittizi fra nodi che non si raggiungono, con un costo molto grande, per esempio $M = c_max + 1$, e l'algoritmo li userà solo se necessario. Se ci sono costi negativi si aggiunge a tutti i lati la stessa costante $delta = -c_min + 1$ ($c_min$ il costo più piccolo): tutti i costi diventano positivi e la soluzione ottima non cambia, perché ogni albero ha $n - 1$ lati e il suo costo cresce di $(n - 1) delta$, uguale per tutti.
+
+*Lo schema generale: Greedy-MST*. L'albero si costruisce passo passo, decidendo lato per lato se includerlo o escluderlo. Si tengono due insiemi di lati, sempre disgiunti ($S subset.eq E$, $R subset.eq E$, $S inter R = emptyset$):
+- $S$: i lati *scelti*, già nell'albero;
+- $R$: i lati *scartati*, che nell'albero non entreranno mai.
+
+Le operazioni sono due. Servono i *tagli*: presi due insiemi di nodi non vuoti e disgiunti $V'$ e $V''$ con $V' union V'' = V$, il taglio $E(V', V'')$ è l'insieme dei lati con un estremo in $V'$ e l'altro in $V''$, i "ponti" fra le due parti.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  grafo(posMST, LMST.map(e => (str(e.at(0)), str(e.at(1)))), scelti: (("2", "4"), ("3", "4")),
+    costi: LMST.map(e => (str(e.at(0)) + "-" + str(e.at(1)), e.at(2))).to-dict(),
+    colori: ("2": rgb("#d6e4ff"), "3": rgb("#d6e4ff"), "4": rgb("#d6e4ff")), scala: 0.95),
+  [
+    - *Inserzione*: si prende un taglio in cui nessun lato è già in $S$, e fra i suoi lati non scartati si sceglie quello di *costo minimo*, che entra in $S$. Garantisce la connessione: per passare da una parte all'altra serve un ponte, e si prende il più economico.
+    - *Cancellazione*: si prende un ciclo $C$ senza lati scartati, e fra i suoi lati non scelti si scarta quello di *costo massimo*, che va in $R$. Evita i cicli: un ciclo nell'albero non ci può stare, e il lato più caro non serve.
+
+    Nel disegno $S = {{2, 4}, {3, 4}}$ (in blu). Col taglio fra i nodi azzurri e gli altri, il lato più economico è ${1, 3}$ (5).
+  ])
+
+#teorema[Lemma di correttezza][Siano $S$ i lati scelti e $R$ quelli scartati, e supponiamo che esista un albero di copertura ottimo $T^*$ che contiene tutti i lati di $S$ e nessuno di $R$. Allora, dopo un'inserzione o una cancellazione, anche i nuovi $S'$ e $R'$ hanno questa proprietà.]
+
+Partendo da $S = R = emptyset$ la proprietà vale, e ogni operazione la mantiene: per induzione Greedy-MST finisce sempre con un albero di copertura di costo minimo (se esiste), *in qualunque ordine* si facciano le operazioni.
+
+```
+procedure S = Greedy-MST(G, c)
+  S = ∅;  R = ∅;
+  do
+    applica Inserzione o Cancellazione;
+  while (S ∪ R ⊊ E and |S| < n - 1);
+```
+
+Si va avanti finché non sono stati classificati tutti i lati ($S union R = E$) o finché $S$ ha $n - 1$ lati: a quel punto è un albero completo, e un lato in più creerebbe un ciclo. La complessità è $O(m)$, perché si valuta al più ogni lato. Gli algoritmi pratici sono casi particolari dello schema, che si distinguono per l'ordine delle operazioni: *Kruskal* sceglie sempre il lato più economico che non crea cicli, *Prim* fa crescere un albero aggiungendo nodi vicini. Entrambi rispettano il lemma, quindi sono ottimi.
+
+*Algoritmo di Kruskal*. Si ordinano tutti i lati per costo crescente, $c_1 <= c_2 <= dots <= c_m$, e si esaminano uno alla volta in quest'ordine:
+- se il lato *non forma un ciclo* con quelli già in $S$, entra in $S$: è un'inserzione, perché unisce due pezzi separati e, fra i lati rimasti, è il più economico del taglio fra uno dei due pezzi e il resto;
+- se *forma un ciclo*, va in $R$: è una cancellazione, perché è il più caro del ciclo (gli altri lati del ciclo sono stati esaminati prima).
+
+Ci si ferma appena $|S| = n - 1$, anche se restano lati da esaminare.
+
+#let kr = kruskal(7, LMST)
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  table(columns: 3, align: (center, center, left), inset: 4pt,
+    [lato], [costo], [esito],
+    ..kr.passi.map(((a, b, c, entra)) => (lato((a, b)), [#c], if entra [entra in $S$] else [ciclo: va in $R$])).flatten()),
+  [
+    #grafo(posMST, LMST.map(e => (str(e.at(0)), str(e.at(1)))), scelti: kr.S.map(e => (str(e.at(0)), str(e.at(1)))),
+      costi: LMST.map(e => (str(e.at(0)) + "-" + str(e.at(1)), e.at(2))).to-dict(), scala: 0.95)
+
+    Al lato #lato(kr.passi.last()) $S$ ha già $n - 1 = 6$ lati: ci si ferma, e #LMST.filter(e => not kr.passi.any(p => p.at(0) == e.at(0) and p.at(1) == e.at(1))).map(lato).join([, ]) non si guardano nemmeno. L'albero (in blu) costa #kr.S.map(e => str(e.at(2))).join(" + ") = #kr.S.map(e => e.at(2)).sum().
+  ])
+
+*Complessità di Kruskal*: una fase di ordinamento, $O(m log m)$, e una di selezione, al più $m$ lati. Per controllare in fretta se un lato chiude un ciclo si usa una struttura dati *Union-Find*, che lo fa a costo quasi costante: l'ordinamento domina. In un grafo connesso $n - 1 <= m <= n(n - 1) / 2 = O(n^2)$, quindi $log m <= log n^2 = 2 log n$, e la complessità si scrive anche $O(m log m) = O(m log n)$.
+
+*Algoritmo di Prim*. Somiglia agli algoritmi dei cammini minimi: si sceglie un nodo qualsiasi come radice $r$ e si fa crescere un albero da lì, con un'etichetta $d_v$ per nodo e il predecessore $p_v$. Qui però $d_v$ è il costo del *lato* più economico che collega $v$ all'albero costruito fin qui.
++ *Inizializzazione*: per ogni nodo $p_v = r$ e $d_v = M$ (come degli archi fittizi di costo infinito); per la radice $d_r = -M$; $Q = {r}$.
++ Si estrae da $Q$ il nodo $u$ con etichetta *minima* e gli si mette $d_u = -M$: ora è nell'albero, con il lato ${p_u, u}$.
++ Per ogni lato ${u, v}$: se $c_(u v) < d_v$, allora $d_v = c_(u v)$ e $p_v = u$, e $v$ entra in $Q$ se non c'è già.
++ Si torna al passo 2 finché $Q$ non è vuota.
+
+L'etichetta $-M$ dei nodi già nell'albero non può mai essere migliorata, quindi quei nodi non vengono più toccati e non si formano cicli: Prim non fa mai cancellazioni. Ogni estrazione, tranne la prima, è un'*inserzione* sul taglio fra i nodi con etichetta $-M$ (l'albero) e tutti gli altri. Radice 1:
+
+#let pr = prim(7, LMST, 1)
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  table(columns: 4, align: (center, center, left, center), inset: 4pt,
+    [estraggo $u$], [entra], [etichette aggiornate], [costo],
+    ..pr.passi.map(((u, pu, cambi, Q, costo)) => ([#u], if u == 1 [—] else { lato((pu, u)) }, cambi-d(cambi), [#costo])).flatten()),
+  grafo(posMST, LMST.map(e => (str(e.at(0)), str(e.at(1)))), scelti: range(2, 8).map(v => (str(pr.p.at(v)), str(v))),
+    costi: LMST.map(e => (str(e.at(0)) + "-" + str(e.at(1)), e.at(2))).to-dict(), scala: 0.95))
+
+Stesso albero di Kruskal, di costo #pr.costo. Per esempio, quando esce 4 il lato ${2, 4}$ fa scendere l'etichetta di 2 da 8 a 2: da quel momento 2 è più vicino all'albero passando da 4 che da 1.
+
+#block(breakable: false, nota[*Prim e Dijkstra* (domanda da orale): stesso schema, etichette diverse.
+#table(columns: 3, align: (left, left, left),
+  [], [Dijkstra], [Prim],
+  [grafo], [orientato], [non orientato],
+  [$d_v$ è], [il costo del *cammino* da $r$ a $v$], [il costo del *solo lato* che collega $v$ all'albero],
+  [aggiorno se], $d_u + c_(u v) < d_v$, $c_(u v) < d_v$,
+  [nodo estratto], [etichetta definitiva], [etichetta $-M$: è nell'albero],
+  [minimizza], [il costo di ogni cammino], [la somma dei costi dei lati],
+)])
+
+#heading(numbering: none)[Riepilogo]
+
+*Trucchi di modellazione*
+
+#align(center, table(columns: 2, align: (left, left),
+  [voglio], [scrivo],
+  [esattamente / almeno / al più uno], [$sum x = 1$, $quad >= 1$, $quad <= 1$],
+  [se A allora C], [$x_A <= x_C$],
+  [$C = A and B$], [$x_C >= x_A + x_B - 1$, $x_C <= x_A$, $x_C <= x_B$],
+  [$C = A or B$], [$x_C >= x_A$, $x_C >= x_B$, $x_C <= x_A + x_B$],
+  [legare $y$ binaria a $x$ continua], [$x <= M y$ (o $x <= u y$ con la capacità)],
+  [valori discreti $d_1, dots, d_n$], [$y = sum d_i z_i$, $sum z_i <= 1$],
+  [semicontinua: 0 oppure $[l, u]$], [$l z <= y <= u z$],
+  [funzione a tratti], [una $z^i$ e una $w^i$ per tratto, $l_i z^i <= w^i <= u_i z^i$, $sum z^i <= 1$],
+  [$min max_i f_i (x)$], [$min v$, $v >= f_i (x)$],
+  [$max min_i f_i (x)$], [$max v$, $v <= f_i (x)$],
+  [$min abs(f(x))$], [$min v$, $v >= f(x)$, $v >= -f(x)$],
+  [vale I oppure II], [$I <= b_I + M y_I$, $I I <= b_(I I) + M y_(I I)$, $y_I + y_(I I) <= 1$],
+  [prodotto di probabilità $>= p$], [$sum (log p_(i j)) x_(i j) >= log p$],
+))
+
+*Algoritmi sui grafi*
+
+#align(center, table(columns: 4, align: (left, left, center, left),
+  [algoritmo], [sceglie da $Q$], [complessità], [note],
+  [visita], [il primo (fila)], $O(m)$, [dice se un nodo è raggiungibile],
+  [SPT.L, Bellman-Ford], [il primo (fila)], $O(n m)$, [costi negativi ammessi; nodo in coda $n$ volte $=>$ ciclo negativo],
+  [SPT.S, Dijkstra], [etichetta minima], [$O(n^2)$, heap $O(m log n)$], [solo costi $>= 0$; ogni nodo esce una volta],
+  [SPT.Acyclic], [ordine topologico], $O(m)$, [solo grafi aciclici; costi negativi ammessi],
+  [Kruskal], [lati per costo crescente], $O(m log n)$, [stop a $n - 1$ lati],
+  [Prim], [etichetta minima (costo del lato)], [], [nodi dell'albero a $-M$],
+))
