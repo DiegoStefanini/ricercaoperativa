@@ -429,7 +429,7 @@ Perché conta: se funzione obiettivo e vincoli sono lineari, il problema è di *
 
 Lo stesso problema si può scrivere con *modelli diversi*: nel corso l'efficienza non conta, basta che il modello funzioni (anche con qualche vincolo in più).]
 
-== Il problema della fonderia (mix di produzione)
+== Il problema della fonderia (mix di produzione) <fonderia>
 
 #align(center, stack(dir: ltr, spacing: 0.8em,
   grid(columns: 1, gutter: 3pt,
@@ -523,7 +523,7 @@ canvas(length: 0.6cm, {
 ])
 ]
 
-== Variabili binarie: zaino e relazioni logiche
+== Variabili binarie: zaino e relazioni logiche <binarie>
 
 Un investitore ha un capitale $B$ e $n$ progetti. Il progetto $i$ costa $c_i$ e rende $w_i$. Quali progetti finanzio per rendere il più possibile senza sforare il budget?
 
@@ -752,7 +752,7 @@ Il vincolo $sum x_(i j) = n$ ora è *ridondante*: se ogni vertice tocca 2 lati, 
 
 #nota[È il modello dell'albero di copertura più i vincoli di grado 2. Non è l'unico modello del TSP: si può usare una variabile per ogni ciclo hamiltoniano (ma sono un numero esponenziale e bisogna generarli tutti), oppure sostituire i vincoli di taglio con vincoli che vietano direttamente i sottocicli.]
 
-== Assegnamento, semi-assegnamento e colorazione di grafi
+== Assegnamento, semi-assegnamento e colorazione di grafi <assegnamento>
 
 Un'azienda deve assegnare delle attività a dei lavoratori. Lavoratori $L$ e attività $A$ sono due insiemi con lo stesso numero $n$ di elementi. Assegnare il lavoratore $i in L$ all'attività $j in A$ costa $c_(i j)$. Tutte le attività vanno assegnate e ogni lavoratore riceve *una e una sola* attività; si vuole il costo minimo.
 
@@ -863,7 +863,7 @@ $
 
 Prima lo stesso problema aveva modelli diversi; qui succede il contrario: *lo stesso modello risolve problemi diversi*.
 
-== Selezione di sottoinsiemi: partizione, copertura, riempimento
+== Selezione di sottoinsiemi: partizione, copertura, riempimento <sottoinsiemi>
 
 Nel modello dei moli la soluzione è costruita a pezzettini: una variabile per ogni coppia barca-molo. Niente vieta di usare *pezzi più grandi*. Invece di decidere barca per barca, elenco tutti i *turni* possibili di un molo (cioè tutti i gruppi di barche che un molo può servire in una giornata senza sovrapposizioni) e uso una variabile per ogni turno: lo scelgo oppure no.
 
@@ -1307,7 +1307,7 @@ $
 
 Il 100 e il 400 entrano in $x_3$ moltiplicati per la binaria: con $z^1_3 = 1$ ho già 100 kg, il minimo ordinabile. La funzione obiettivo completa è $min f_1 + f_2 + f_3 + 10 x_4$, con $f_2$ il costo di B scritto prima e $10 x_4$ il manganese puro, che non cambia.
 
-== Linearizzazioni: min-max, valore assoluto, vincoli disgiuntivi
+== Linearizzazioni: min-max, valore assoluto, vincoli disgiuntivi <linearizzazioni>
 
 Finora ogni vincolo era lineare, o lo diventava con una binaria per caso. Restano tre cose che lineari non sono: il *massimo* fra più quantità, il *valore assoluto*, un *"oppure"* fra due vincoli. Per ognuna c'è un trucco.
 
@@ -1524,6 +1524,61 @@ Il logaritmo trasforma prodotti in somme, $log(a dot b) = log a + log b$, ed è 
 Applico il logaritmo ai due lati, poi la somma sugli archi scelti diventa una somma su tutti gli archi pesata con le $x$, come nello zaino:
 $ log(product_(x_(i j) = 1) p_(i j)) >= log 0.9 quad -> quad sum_(x_(i j) = 1) log p_(i j) >= log 0.9 quad -> quad sum_((i, j) in A) (log p_(i j)) x_(i j) >= log 0.9 $
 I $log p_(i j)$ sono numeri, calcolati sui dati: il vincolo è lineare.
+
+#heading(level: 2, numbering: none)[Riepilogo: i trucchi del capitolo]
+
+Ogni esempio del capitolo serve a insegnare uno o più trucchi. All'esame il testo è nuovo: bisogna riconoscere quale trucco serve. Le tabelle dicono, per ogni trucco, come lo segnala il testo, come si scrive e dove è spiegato.
+
+#text(9.5pt)[
+#align(center, table(columns: (auto, auto), align: (left, left),
+  [relazione logica (tutte binarie, @binarie[§])], [si scrive],
+  [esattamente / almeno / al massimo uno fra A e B], [$x_A + x_B = 1$ / $>= 1$ / $<= 1$],
+  [B = non A], $x_B = 1 - x_A$,
+  [se A allora C], $x_A <= x_C$,
+  [A se e solo se C], $x_A = x_C$,
+  [se A e B allora C (*devo*)], $x_C >= x_A + x_B - 1$,
+  [C solo se A e B (*posso solo se*)], [$x_C <= x_A$, $x_C <= x_B$],
+  [se A o B allora C (*devo*)], [$x_C >= x_A$, $x_C >= x_B$],
+  [C solo se A o B (*posso solo se*)], $x_C <= x_A + x_B$,
+  [C = A xor B], [$x_C >= x_A - x_B$, $x_C >= x_B - x_A$, \ $x_C <= 2 - x_A - x_B$, $x_C <= x_A + x_B$],
+))
+
+#align(center, table(columns: (auto, auto, auto), align: (left, left, center),
+  [nel testo], [si scrive], [dove],
+  [prendo o non prendo, entro un budget], [$x_i in {0, 1}$, $sum_i c_i x_i <= B$ (zaino)], [@binarie[§]],
+  [percentuale o rapporto fra variabili], [moltiplico per il denominatore: \ $x_1 >= 0.2 (x_1 + x_2 + x_3)$], [@fonderia[§]],
+  [scegliere lati che tengano tutto collegato], [taglio: $sum_(i in S, j in.not S) x_(i j) >= 1$ per ogni $S$], [@mst-modello[§]],
+  [giro che passa da tutti], [grado 2: $sum_j x_(i j) = 2$ per ogni $i$, più il taglio], [@mst-modello[§]],
+  [ogni $i$ ha uno e un solo $j$, e viceversa], [$sum_j x_(i j) = 1$ per ogni $i$, $sum_i x_(i j) = 1$ per ogni $j$ \ (da un lato solo: semi-assegnamento)], [@assegnamento[§]],
+  [due elementi incompatibili non condividono \ una risorsa], [grafo di incompatibilità, \ $x_(i f) + x_(j f) <= 1$ per ogni ${i, j} in E$], [@assegnamento[§]],
+  [due famiglie di variabili ("uso $f$" e \ "assegno $f$ a $i$")], [vincolo di legame: $y_f >= x_(i f)$], [@assegnamento[§]],
+  [si possono elencare tutte le combinazioni \ ammissibili (turni, giri)], [una variabile per combinazione; \ le regole del testo vanno nella costruzione], [@sottoinsiemi[§]],
+  [ogni elemento in esattamente / almeno / al più \ un insieme scelto], [$sum_(S : i in S) y_S = 1$ / $>= 1$ / $<= 1$ \ (partizione / copertura / riempimento)], [@sottoinsiemi[§]],
+  [bonus solo con almeno $k$ elementi], [$sum_c x_c >= k z$], [@sottoinsiemi[§]],
+  [il parametro dice se $c$ usa $h$], [$sum_c a_(h c) x_c$: chi non usa $h$ sparisce], [@sottoinsiemi[§]],
+  [quello che entra meno quello che esce], [$sum_j x_(j i) - sum_j x_(i j) = b_i$, capacità $x_(i j) <= u_(i j)$], [@flusso[§]],
+))
+
+#align(center, table(columns: (auto, auto, auto), align: (left, left, center),
+  [nel testo], [si scrive], [dove],
+  [valore scelto da un elenco $d_1, dots, d_n$], [$y = sum_i d_i z_i$, $sum_i z_i = 1$ ($<= 1$ se è ammesso 0)], [@tratti[§]],
+  [0 oppure fra $l$ e $u$ (semicontinua)], [$l z <= y <= u z$], [@tratti[§]],
+  [costo fisso $k$ se produco], [$min c x + k y$, $l y <= x <= u y$ (senza $u$: $x <= M y$)], [@tratti[§]],
+  [costo diverso a seconda del tratto], [una $z^i$ e una $w^i$ per tratto: $x = sum_i w^i$, \ $l_i z^i <= w^i <= u_i z^i$, $sum_i z^i <= 1$], [@tratti[§]],
+  [minimizzare il massimo], [$min v$, $v >= f_i (x)$ per ogni $i$], [@linearizzazioni[§]],
+  [massimizzare il minimo], [$max v$, $v <= f_i (x)$ per ogni $i$], [@linearizzazioni[§]],
+  [valore assoluto], [$min v$, $v >= f(x)$, $v >= -f(x)$], [@linearizzazioni[§]],
+  [vale un gruppo di vincoli *oppure* un altro], [$A_i x <= b_i + M_h y_h$, $y_1 + dots + y_p <= p - 1$ \ ($y_h = 1$ spegne il gruppo $h$)], [@linearizzazioni[§]],
+  [prodotto di probabilità almeno $p$], [$sum_(i j) (log p_(i j)) x_(i j) >= log p$], [@linearizzazioni[§]],
+))
+]
+
+*Come controllare un modello* (è la domanda vero/falso su un modello parziale):
++ per ogni vincolo: se lo tolgo, quale soluzione sbagliata diventa possibile? Se nessuna, il vincolo è ridondante;
++ se ci sono due famiglie di variabili, c'è il vincolo che le lega? Senza, il $min$ o il $max$ ne mette una dove gli conviene;
++ tutto è lineare? Niente $<$, $>$, $!=$, prodotti o divisioni fra variabili, $abs(x)$, $max$ dentro i vincoli;
++ min-max e max-min sì, max-max no: niente ferma $v$;
++ è scritto il dominio di ogni variabile?
 
 = Grafi e reti di flusso
 
