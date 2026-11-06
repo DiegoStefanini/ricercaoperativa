@@ -5,7 +5,7 @@ Workflow generale: `../CLAUDE.md`.
 - Docente: Stefano Novellani (stefano.novellani@unipi.it), a.a. 2026-27.
 - Testo: Bigi, Frangioni, Gallo, Pallottino, Scutellà, "Appunti di Ricerca Operativa" = `slide/AppuntiRO.pdf`. Le slide citano le pagine delle dispense ("PAG 9-47 DISPENSE").
 - Esame: scritto + orale (orale = ±5 punti sul voto dello scritto). Solo calcolatrice non programmabile. Programma e regole complete in `programma.md`.
-- Prove in itinere (esonerano dallo scritto se "quasi sufficiente"): **prova 1 lunedì 16/11 ore 16-18** (iscrizione col form su Teams entro domenica 8/11 ore 14, serve la carta dello studente) = 1 esercizio di modellazione vero/falso su un modello parziale + domanda aperta, e 3 esercizi sui grafi. **Prova 2 a fine corso** = 4 esercizi su PL e Branch&Bound. Le slide dicono "tre prove", `programma.md` dice "due": da chiarire.
+- Prove in itinere (esonerano dallo scritto se "quasi sufficiente"): **prova 1 lunedì 16/11 ore 16-18** (iscrizione col form su Teams entro domenica 8/11 ore 14, serve la carta dello studente) = 1 esercizio di modellazione vero/falso su un modello parziale + domanda aperta, e 3 esercizi sui grafi. **Prova 2 a fine corso** = 4 esercizi su PL e Branch&Bound. **Da quest'anno le prove sono due** (confermato da Diego): modellazione e grafi stanno insieme nella prova 1, mentre fino al 2025/26 erano due verifiche separate. Le slide dell'introduzione dicono ancora "tre prove" perché sono vecchie.
 
 ## Mappa materiale ↔ lezione
 
