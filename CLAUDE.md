@@ -24,9 +24,13 @@ Workflow generale: `../CLAUDE.md`.
 
 Da riprendere: `GrafiRetiFlusso_v3.pdf` **p. 153** (complessità di Prim; il prof ha detto che farà un recap con quella slide), poi flusso massimo (p. 154). La modellazione è finita.
 
+**Lezioni trascritte ma non ancora in dispensa** (scaricate da Teams il 6/11): 23/10 flusso massimo (tagli, grafo residuo, Edmonds-Karp), 27/10 fine flusso massimo (prima parte non registrata), 3/11 flusso di costo minimo e cicli (la prima registrazione non ha trascrizione). Il 30/10 niente lezione. Le pagine delle slide vanno ricavate da `GrafiRetiFlusso_v8.pdf`, nuova versione con le stesse 294 pagine della v3.
+
+Teams: team "029AA 26/27 - RICERCA OPERATIVA - A [INFR-L]", sito `https://unipiit.sharepoint.com/sites/a__td_74790`. Registrazioni in `General/Recordings`; slide ed eserciziari in un'altra libreria, "Materiale del corso" (`/Slide`, `/Esercizi`), che non si vede dalla tab Shared ma solo con l'API del sito.
+
 All'inizio dei grafi il prof ha detto "vi ho lasciato degli esempi che non affronteremo", e del MCF "ve lo lascio per divertissement": PereCani (Grafi p. 11-15) e ispezioni (p. 27-31, nel buco della registrazione) sono comunque in dispensa, perché sono nelle slide. SPT.Acyclic il prof non l'ha svolto a mano ("ce l'avete sulle dispense"): in dispensa c'è l'esempio delle slide.
 
-Esercizi: `slide/EserciziarioTecincheModellazione.pdf` (modellazione) e `slide/Eserciziario_Grafi.pdf` (SPT.1-12 cammini minimi, MST.1-11, poi flusso massimo e MCF non ancora fatti), utili per la prova 1.
+Esercizi: `slide/Eserciziario_TecincheModellazione.pdf` (modellazione, versione nuova di Teams: 225 pagine contro le 228 della vecchia `EserciziarioTecincheModellazione.pdf`) e `slide/Eserciziario_Grafi.pdf` (SPT.1-12 cammini minimi, MST.1-11, poi flusso massimo e MCF), utili per la prova 1. `C251013.pdf` è il 1° compitino 2025, solo modellazione; `Preparazione1.pdf` è un esercizio di modellazione. `slide/esercizi-svolti/sc*.pdf` sono 19 appelli svolti 2017-2020 (`scAAMMGG`): l'es. 3 è quasi sempre cammini minimi, il 4 flusso massimo (Edmonds-Karp) o MCF (cancellazione di cicli), entrambi per la prova 1. Gli es. 1-2 (PL) e 6 (B&B: zaino, TSP) servono per la prova 2.
 
 Pagine = pagine del PDF (la v6 ha le stesse pagine della v5 e della v4, solo refusi corretti). In `GrafiRetiFlusso_v3.pdf` il numero stampato è PDF + 1 da p. 45 circa, + 3 da p. 72, + 5 verso p. 145: "pagina 152" di Diego era la pagina del PDF. Dalla p. 5 il numero stampato sulla slide è PDF + 1 (la v4 ha tolto una slide doppia della fonderia ma non ha rinumerato): quando Diego dice "slide N" può intendere il numero stampato.
 
