@@ -30,7 +30,13 @@ Teams: team "029AA 26/27 - RICERCA OPERATIVA - A [INFR-L]", sito `https://unipii
 
 All'inizio dei grafi il prof ha detto "vi ho lasciato degli esempi che non affronteremo", e del MCF "ve lo lascio per divertissement": PereCani (Grafi p. 11-15) e ispezioni (p. 27-31, nel buco della registrazione) sono comunque in dispensa, perché sono nelle slide. SPT.Acyclic il prof non l'ha svolto a mano ("ce l'avete sulle dispense"): in dispensa c'è l'esempio delle slide.
 
-Esercizi: `slide/Eserciziario_TecincheModellazione.pdf` (modellazione, versione nuova di Teams: 225 pagine contro le 228 della vecchia `EserciziarioTecincheModellazione.pdf`) e `slide/Eserciziario_Grafi.pdf` (SPT.1-12 cammini minimi, MST.1-11, poi flusso massimo e MCF), utili per la prova 1. `C251013.pdf` è il 1° compitino 2025, solo modellazione; `Preparazione1.pdf` è un esercizio di modellazione. `slide/esercizi-svolti/sc*.pdf` sono 19 appelli svolti 2017-2020 (`scAAMMGG`): l'es. 3 è quasi sempre cammini minimi, il 4 flusso massimo (Edmonds-Karp) o MCF (cancellazione di cicli), entrambi per la prova 1. Gli es. 1-2 (PL) e 6 (B&B: zaino, TSP) servono per la prova 2.
+Esercizi: `slide/Eserciziario_TecincheModellazione.pdf` (modellazione, versione nuova di Teams: 225 pagine contro le 228 della vecchia `EserciziarioTecincheModellazione.pdf`) e `slide/Eserciziario_Grafi.pdf` (SPT.1-12 cammini minimi, MST.1-11, poi flusso massimo e MCF), utili per la prova 1.
+
+Prove d'esame, da elearning (corso https://elearning.di.unipi.it/course/view.php?id=1150), tutte con soluzione:
+- `slide/preparazione/Preparazione{1,2,3}-sol.pdf`: le esercitazioni del prof per le verifiche 1, 2 e 3. In radice ci sono `Preparazione1.pdf` e `C251013.pdf`, solo testo.
+- `slide/esercizi-svolti/C<AAMMGG>-S|-sol.pdf`: 27 prove 2023/24-2025/26. Fino al 2025/26 c'erano tre verifiche: la **1ª** di modellazione (2 esercizi), la **2ª** sui grafi (cammini minimi, MST, flusso massimo, MCF), la **3ª** su PL e B&B. La prova 1 di quest'anno unisce la 1ª e la 2ª, quindi le prove più simili sono C231009, C241014, C251013 (1ª) e C2311220, C241114, C251117 (2ª). Negli appelli l'es. 1 è di modellazione, gli es. 2-3 sono sui grafi e i successivi su PL e B&B.
+- `slide/esercizi-svolti/sc*.pdf`: 19 appelli 2017-2020 dallo zip di Teams, formato vecchio (es. 3 cammini minimi, es. 4 flusso massimo o MCF). Vanno usati solo come riserva.
+- Su elearning ci sono anche gli appelli 2020/21 e 2021/22 (corsi id=201 e id=256), non ancora scaricati.
 
 Pagine = pagine del PDF (la v6 ha le stesse pagine della v5 e della v4, solo refusi corretti). In `GrafiRetiFlusso_v3.pdf` il numero stampato è PDF + 1 da p. 45 circa, + 3 da p. 72, + 5 verso p. 145: "pagina 152" di Diego era la pagina del PDF. Dalla p. 5 il numero stampato sulla slide è PDF + 1 (la v4 ha tolto una slide doppia della fonderia ma non ha rinumerato): quando Diego dice "slide N" può intendere il numero stampato.
 
