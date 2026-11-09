@@ -448,22 +448,50 @@
 #let inversi(archi, Ns) = archi.filter(e => e.at(1) in Ns and e.at(0) not in Ns)
 #let flusso-taglio(archi, Ns) = diretti(archi, Ns).map(e => e.at(4)).sum(default: 0) - inversi(archi, Ns).map(e => e.at(4)).sum(default: 0)
 #let cap-taglio(archi, Ns) = diretti(archi, Ns).map(e => e.at(3)).sum(default: 0)
-// SPT.L con tutti i nodi come radici: etichette a 0, predecessore = se stesso, Q = tutti i nodi
-#let spt-tutte(n, archi, max: 200) = {
-  let d = (0,) * (n + 1)
+// SPT.L con più radici: etichetta 0 e predecessore = se stesso per le radici, che partono tutte in Q
+#let spt-radici(n, archi, radici, max: 200) = {
+  let d = (none,) * (n + 1)
   let p = range(n + 1)
-  let Q = range(1, n + 1)
+  for r in radici { d.at(r) = 0 }
+  let Q = radici
   let passi = ()
   while Q.len() > 0 and passi.len() < max {
     let i = Q.first()
     Q = Q.slice(1)
     let cambi = ()
     for (a, j, c) in uscenti(archi, i) {
-      if d.at(i) + c < d.at(j) { d.at(j) = d.at(i) + c; p.at(j) = i; cambi.push((j, d.at(j))); if j not in Q { Q.push(j) } }
+      if d.at(j) == none or d.at(i) + c < d.at(j) { d.at(j) = d.at(i) + c; p.at(j) = i; cambi.push((j, d.at(j))); if j not in Q { Q.push(j) } }
     }
     passi.push((i, cambi, Q))
   }
   (d: d, p: p, passi: passi)
+}
+#let spt-tutte(n, archi) = spt-radici(n, archi, range(1, n + 1))
+// sbilanciamento e_x(i) = entra - esce - b_i (b = vettore dei deficit, b.at(i - 1) per il nodo i)
+#let sbil(archi, b, i) = -esce(archi, i) - b.at(i - 1)
+// cammini minimi successivi: si saturano gli archi di costo negativo, poi cammini minimi da O_x verso il nodo di D_x più vicino
+#let cammini-successivi(n, archi, b) = {
+  let a = archi.map(((i, j, c, u, x)) => (i, j, c, u, if c < 0 { u } else { 0 }))
+  let iniziale = a
+  let passi = ()
+  let vuoto = false
+  for _ in range(50) {
+    let e = range(n + 1).map(i => if i == 0 { 0 } else { sbil(a, b, i) })
+    let O = range(1, n + 1).filter(i => e.at(i) > 0)
+    let D = range(1, n + 1).filter(i => e.at(i) < 0)
+    if O.len() == 0 { break }
+    let T = spt-radici(n, residuo(a).map(((i, j, r, c)) => (i, j, c)), O)
+    let raggiunti = D.filter(i => T.d.at(i) != none)
+    if raggiunti.len() == 0 { vuoto = true; passi.push((e: e, O: O, D: D, d: T.d)); break }
+    let t = raggiunti.sorted(key: i => T.d.at(i) * 1000 + i).first()
+    let nodi = (t,)
+    while T.p.at(nodi.first()) != nodi.first() { nodi.insert(0, T.p.at(nodi.first())) }
+    let thP = capacita(a, nodi)
+    let th = calc.min(thP, e.at(nodi.first()), -e.at(t))
+    a = componi(a, nodi, th)
+    passi.push((e: e, O: O, D: D, d: T.d, cammino: nodi, costo: T.d.at(t), thP: thP, th: th, totale: costo(a)))
+  }
+  (iniziale: iniziale, archi: a, passi: passi, vuoto: vuoto)
 }
 // disegni: mostra = quali numeri scrivere sugli archi, fra "c" (costo), "u" (capacità), "x" (flusso), in ordine;
 // nome(k) = come si chiama il nodo k
@@ -501,6 +529,10 @@
 #let posM = (("1"): (0, 1.2), ("2"): (3.3, 1.2), ("3"): (2.8, 3.1), ("4"): (2.8, -0.7), ("5"): (6.3, 1.2))
 #let M5 = ((1, 2, 10, 10, 10), (1, 3, 3, 2, 0), (1, 4, 1, 2, 0), (2, 3, 1, 7, 0), (2, 4, 3, 4, 0), (2, 5, 10, 10, 10), (3, 5, 5, 6, 0), (4, 5, 6, 5, 0))
 #let cicliM = ((1, 3, 5, 2, 1), (1, 4, 5, 2, 1), (2, 3, 5, 2), (2, 4, 5, 2))
+// accoppiamento: nodi 0..9 (I = 0..4 in basso, J = 5..9 in alto) numerati k + 1, s = 11, t = 12
+#let nomeB(k) = if k == 11 { "s" } else if k == 12 { "t" } else { str(k - 1) }
+#let posB = range(10).map(k => (str(k), (calc.rem(k, 5) * 1.5, if k < 5 { 0 } else { 1.9 }))).to-dict()
+#let ACC = ((0, 5), (0, 6), (1, 5), (2, 6), (2, 7), (2, 8), (2, 9), (3, 9), (4, 9)).map(((i, j)) => (i + 1, j + 1, 0, 1, 0)) + range(1, 6).map(i => (11, i, 0, 1, 0)) + range(6, 11).map(j => (j, 12, 0, 1, 0))
 #let noteM = (("1"): ((0, -0.62), text(fill: verde, $-10$)), ("5"): ((0, -0.62), text(fill: verde, $10$)))
 
 #let si = text(fill: verde, weight: "bold")[✓]
@@ -1710,13 +1742,15 @@ Ogni esempio del capitolo serve a insegnare uno o più trucchi. All'esame il tes
   [calcolare le etichette di un albero, controllare le condizioni di Bellman e dimostrare il teorema;],
   [eseguire a mano Bellman-Ford (SPT.L) e Dijkstra (SPT.S), e sapere quale usare e quanto costano;],
   [numerare topologicamente un grafo e trovare i cammini minimi su un grafo aciclico;],
-  [eseguire Kruskal e Prim, e spiegare in cosa Prim è diverso da Dijkstra;],
+  [eseguire Kruskal e Prim, spiegare in cosa Prim è diverso da Dijkstra, e controllare le condizioni di ottimalità per tagli e per cicli;],
   [scrivere il modello del flusso massimo, controllare se un flusso dato è ammissibile e quanto vale;],
   [dire cos'è un cammino aumentante e calcolarne la capacità; costruire il grafo residuo;],
   [eseguire Edmonds-Karp, trovare il taglio di capacità minima e dimostrare che flusso e taglio sono ottimi;],
   [dire se un MCF è ammissibile col flusso massimo, e quali capacità aumentare se non lo è;],
   [calcolare sbilanciamenti e costo di cammini e cicli, costruire il grafo residuo pesato e migliorare un flusso cancellando cicli di costo negativo;],
-  [enunciare la decomposizione degli pseudoflussi, dimostrare il criterio di ottimalità e certificarlo con Bellman-Ford a radici multiple.],
+  [enunciare la decomposizione degli pseudoflussi, dimostrare il criterio di ottimalità e certificarlo con Bellman-Ford a radici multiple;],
+  [dire se uno pseudoflusso è minimale (e renderlo tale), eseguire i cammini minimi successivi e dimostrare il teorema di minimalità;],
+  [risolvere un accoppiamento di massima cardinalità col flusso massimo, e scrivere l'assegnamento di costo minimo come MCF.],
 )
 
 Molti problemi di ottimizzazione hanno la forma di un grafo: a volte è evidente (reti stradali, ferroviarie, di telecomunicazioni, idriche, elettriche), a volte nasce dal modo in cui si scrive il modello. Nel capitolo precedente i problemi su grafi li abbiamo solo *scritti*; qui li *risolviamo*, con algoritmi fatti apposta, a partire dai più semplici.
@@ -2213,6 +2247,12 @@ Su un grafo denso ($m approx n^2$) Kruskal fa $O(n^2 log n)$ e Prim con la coda 
   [minimizza], [il costo di ogni cammino], [la somma dei costi dei lati],
 )])
 
+*Condizioni di ottimalità*. Nei compiti capita un albero già dato, e si chiede se è di costo minimo. Si controlla con due condizioni equivalenti (le richiama l'eserciziario del prof), che vengono dalle due operazioni di Greedy-MST:
+- *per tagli*: togliendo dall'albero un suo lato $e$, l'albero si spezza in due parti, cioè un taglio. $e$ deve avere costo minimo fra tutti i lati di quel taglio: se un altro lato del taglio costa strettamente meno, lo si mette al posto di $e$ e l'albero costa meno;
+- *per cicli*: aggiungendo all'albero un lato $e$ che non ne fa parte si forma un solo ciclo. $e$ deve costare almeno quanto ogni altro lato del ciclo: se costa meno del lato più caro, si toglie quello e l'albero costa meno.
+
+La prima controlla i lati dell'albero, la seconda quelli fuori. Nell'albero dell'esempio, togliendo ${4, 5}$ restano ${5, 7}$ e ${1, 2, 3, 4, 6}$: i lati del taglio sono ${2, 5}$ (18), ${4, 5}$ (12), ${4, 7}$ (14) e ${6, 7}$ (26), e ${4, 5}$ è il più economico. Aggiungendo ${1, 2}$ (8) si chiude il ciclo $1 - 2 - 4 - 3 - 1$, con gli altri lati da 2, 3 e 5: ${1, 2}$ è il più caro, quindi non migliora l'albero.
+
 == Flusso massimo <mf>
 
 Nei cammini minimi gli archi hanno un costo ma nessuna capacità; qui è il contrario. È dato un grafo orientato $G = (N, A)$ in cui ogni arco ha una *capacità* $u_(i j)$ (il prof la scrive anche $mu_(i j)$), più due nodi speciali: la *sorgente* $s$, da cui parte il flusso, e il *pozzo* $t$, dove arriva. Si vuole la quantità massima di flusso che si può portare da $s$ a $t$ rispettando le capacità: è il limite di una rete idrica, elettrica o di telecomunicazioni.
@@ -2513,6 +2553,140 @@ Di nuovo pseudopolinomiale.
 
 *Si può migliorare?* I punti deboli sono tre: la soluzione iniziale può essere lontana dall'ottimo; i cicli trovati possono migliorare poco (costo poco negativo o capacità piccola); trovarli richiede molte iterazioni. Cercare il ciclo più negativo è NP-arduo, mentre il ciclo di *costo medio* minimo (costo diviso numero di archi) si trova in tempo polinomiale e rende polinomiale l'algoritmo; anche lo *scaling*, che lavora prima sulle cifre più significative di capacità e costi, dà una complessità polinomiale. Il miglioramento più semplice è partire da una soluzione più vicina all'ottimo: il flusso massimo cerca cammini qualsiasi, mentre conviene cercare cammini aumentanti *di costo minimo* nel grafo residuo pesato.
 
+#let csM = cammini-successivi(5, M5, (-10, 0, 0, 0, 10))
+*Cammini minimi successivi: l'idea*. Si riparte dall'esempio, dal flusso nullo. Con $x = 0$ gli sbilanciamenti sono $e_x (i) = -b_i$: $e_1 = 10$ e $e_5 = -10$. Invece di un cammino aumentante qualsiasi da 1 a 5, si cerca il cammino *di costo minimo* nel grafo residuo pesato (con un albero dei cammini minimi di radice 1), e ci si manda tutto il flusso che si può:
+#align(center, table(columns: 5, align: (left, center, center, center, center),
+  [cammino minimo], [costo], [capacità], [$theta$], [costo del flusso],
+  ..csM.passi.map(p => (freccia(p.cammino), $#p.costo$, $#p.thP$, $#p.th$, $#p.totale$)).flatten()))
+All'ultimo passo il cammino potrebbe portare #csM.passi.last().thP unità, ma ne servono solo #csM.passi.last().th: mandandone di più il nodo 1 andrebbe in difetto e il 5 in eccedenza. Ora tutti i nodi sono bilanciati e il flusso è ammissibile: costa #csM.passi.last().totale, ed è lo stesso flusso ottimo trovato cancellando i cicli. Mandando flusso sempre lungo il cammino più economico non si crea mai un ciclo di costo negativo: il flusso trovato è già ottimo, senza cicli da cancellare.
+
+#let N4 = ((1, 2, 3, 20, 0), (2, 3, 7, 10, 0), (2, 4, 4, 15, 0), (4, 1, -10, 10, 0))
+#let bN4 = (-10, 0, 10, 0)
+#let posN4 = (("1"): (0, 1.3), ("2"): (2.6, 1.3), ("3"): (5.2, 1.3), ("4"): (2.6, -0.3))
+#let csN4 = cammini-successivi(4, N4, bN4)
+#let noteN4(e) = range(1, 5).map(k => (str(k), ((if k == 4 { 0.75 } else { 0 }, if k == 4 { 0 } else { 0.6 }), text(fill: verde, $#e.at(k)$)))).to-dict()
+*Il problema dei costi negativi*. I cammini minimi però non esistono se nel grafo residuo c'è un ciclo orientato di costo negativo, e può succedere già alla prima iterazione: basta un arco di costo negativo. Qui sotto (a sinistra, con $c_(i j), u_(i j)$ e i deficit in verde) il nodo 1 deve mandare 10 unità al nodo 3. Col flusso nullo il grafo residuo è il grafo stesso, e contiene il ciclo $1 -> 2 -> 4 -> 1$ di costo $3 + 4 - 10 = -3$: Bellman-Ford non trova un cammino minimo, trova il ciclo.
+
+La soluzione è *saturare subito tutti gli archi di costo negativo*: $x_(i j) = u_(i j)$ se $c_(i j) < 0$, e 0 negli altri. Nel grafo residuo un arco saturo resta solo al contrario, con costo $-c_(i j) > 0$: non ci sono più archi di costo negativo, e quindi nemmeno cicli negativi. Gli sbilanciamenti però cambiano: la coda dell'arco saturato ha mandato flusso e il suo $e$ scende, la testa l'ha ricevuto e il suo $e$ sale. Qui si satura $(4, 1)$:
+$ e_4 = 0 - 10 - 0 = -10, quad quad e_1 = 10 - 0 - (-10) = 20. $
+Ora i nodi in eccedenza sono $O_x = #insieme(csN4.passi.first().O)$ e quelli in difetto $D_x = #insieme(csN4.passi.first().D)$ (a destra, con $c_(i j), u_(i j), x_(i j)$ e gli sbilanciamenti in verde): i cammini si cercano da $O_x$ a $D_x$, che non sono più per forza sorgenti e pozzi.
+
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  disegna-flusso(N4, posN4, mostra: "cu", scala: 1, note: noteN4((0,) + bN4)),
+  text(16pt)[→],
+  disegna-flusso(csN4.iniziale, posN4, mostra: "cux", scala: 1, note: noteN4(csN4.passi.first().e))))
+
+Da qui l'algoritmo prosegue con i cammini minimi:
+#align(center, table(columns: 4, align: (left, center, center, center),
+  [cammino minimo], [costo], [$theta$], [costo del flusso],
+  [—], [], [], $#costo(csN4.iniziale)$,
+  ..csN4.passi.map(p => (freccia(p.cammino), $#p.costo$, $#p.th$, $#p.totale$)).flatten()))
+Il primo cammino arriva in 4, che è il nodo di $D_x$ più vicino; il secondo in 3.
+
+*Pseudoflussi minimali*. Quello costruito saturando gli archi negativi non è un flusso, ma uno pseudoflusso senza cicli aumentanti di costo negativo. Per i flussi questo voleva dire "ottimo"; per gli pseudoflussi c'è un concetto simile.
+
+#definizione[pseudoflusso minimale][Uno pseudoflusso $x$, con vettore di sbilanciamenti $e_x$, è *minimale* se ha costo minimo fra tutti gli pseudoflussi con lo stesso vettore di sbilanciamenti.]
+
+#teorema[Teorema][$x$ è uno pseudoflusso minimale se e solo se non esistono cicli aumentanti di costo negativo.]
+
+La parte difficile è il "se". *Dimostrazione*, per assurdo: $x$ non ha cicli aumentanti di costo negativo, ma non è minimale.
++ Allora esiste uno pseudoflusso minimale $x^*$ con lo stesso vettore di sbilanciamenti, $e_(x^*) = e_x$, e costo minore.
++ Per la decomposizione, siccome gli sbilanciamenti sono uguali, si passa da $x$ a $x^*$ solo con cicli aumentanti rispetto a $x$.
++ Quei cicli hanno costo $>= 0$, quindi $x^*$ non può costare meno di $x$: contraddizione.
+
+Il *flusso ottimo* è quindi uno pseudoflusso minimale con tutti gli sbilanciamenti nulli. Per controllare se uno pseudoflusso è minimale si costruisce il grafo residuo pesato e ci si cercano cicli orientati di costo negativo, per esempio con Bellman-Ford a radici multiple: se le etichette finali rispettano le condizioni di Bellman, è minimale.
+
+#nota[*Negli esercizi* si chiede anche, se lo pseudoflusso non è minimale, di costruirne uno minimale. Si prende il ciclo aumentante di costo negativo e lo si rende non aumentante *saturando* uno dei suoi archi concordi o *svuotando* uno dei discordi. Gli sbilanciamenti degli estremi di quell'arco cambiano, quindi conviene scegliere l'arco che richiede di spostare meno flusso: così lo sbilanciamento complessivo cresce il meno possibile (è il metodo dell'eserciziario del prof). Poi si controlla che il nuovo grafo residuo non abbia più cicli negativi.]
+
+#teorema[Teorema (minimalità)][Se $x$ è uno pseudoflusso minimale e $P_(s t)$ è un cammino aumentante *di costo minimo* fra $s$ e $t$, allora $x' = x ⊕ theta P_(s t)$ è ancora minimale, per ogni $0 <= theta <= theta(P_(s t), x)$.]
+
+$x'$ ha sbilanciamenti diversi da $x$: quello di $s$ scende, quello di $t$ sale. Può anche costare più di $x$ (nell'esempio il costo sale da $-100$ a $-30$), ma è il meno costoso fra quelli con i suoi sbilanciamenti. *Dimostrazione*, con $s in O_x$ e $t in D_x$. Si prende un qualunque pseudoflusso $x''$ con gli stessi sbilanciamenti di $x'$, e si mostra che $c(x'') >= c(x')$.
++ Per la decomposizione $x'' = x ⊕ theta_1 P_1 ⊕ dots ⊕ theta_h P_h ⊕ theta_(h+1) C_1 ⊕ dots ⊕ theta_k C_(k-h)$. Fra $x$ e $x''$ cambiano solo gli sbilanciamenti di $s$ e $t$ (come fra $x$ e $x'$), quindi i cammini $P_1, dots, P_h$ vanno tutti da $s$ a $t$, e portano in tutto $theta_1 + dots + theta_h = theta$.
++ I cicli hanno costo $c(C_j) >= 0$, perché $x$ è minimale.
++ I cammini costano almeno quanto quello minimo: $c(P_i) >= c(P_(s t))$.
++ Quindi $c(x'') = c(x) + sum_i theta_i c(P_i) + sum_j theta_(h+j) c(C_j) >= c(x) + theta c(P_(s t)) = c(x')$.
+
+*L'algoritmo dei cammini minimi successivi*. Si parte da uno pseudoflusso minimale e si manda flusso lungo cammini di costo minimo, che per il teorema lo lasciano minimale, finché tutti gli sbilanciamenti sono nulli.
+```
+procedure (x, caso) = Cammini-Minimi-Successivi(G, c, b, u)
+  x = Inizializza(c, u);
+  caso = "ottimo";
+  while (Ox ≠ ∅) {
+    (p, d) = Trova-Cammino-Minimo(Gx, Ox, Dx);
+    t = argmin{ d[i] : i ∈ Dx };
+    if (d[t] == ∞) then { caso = "vuoto"; break; }
+    x = Aumenta-Flusso(x, p, t);
+  }
+```
+- *Inizializza*: $x_(i j) = u_(i j)$ se $c_(i j) < 0$, altrimenti 0. È uno pseudoflusso minimale, perché il suo grafo residuo non ha archi di costo negativo.
+- *Trova-Cammino-Minimo*: un albero dei cammini minimi su $G_x$ con *tutti i nodi di $O_x$ come radici* (etichetta 0, tutti in $Q$). Con SPT.L, perché nel grafo residuo possono esserci archi di costo negativo (ma, essendo $x$ minimale, non cicli negativi).
+- Si sceglie come destinazione il nodo $t in D_x$ con *etichetta minima*: è il più vicino, e i predecessori dicono da quale nodo $s in O_x$ parte il cammino. Se anche l'etichetta minima è $infinity$, nessun nodo in difetto si raggiunge da quelli in eccedenza: il problema è *vuoto*.
+- *Aumenta-Flusso* manda lungo il cammino
+  $ theta = min{theta(P_(s t), x), quad e_x (s), quad -e_x (t)} $
+  cioè quanto permettono gli archi, quanto $s$ può dare senza finire in difetto, e quanto $t$ può ricevere senza finire in eccedenza: gli sbilanciamenti si devono annullare, non scambiare.
+
+#let csI = cammini-successivi(2, ((1, 2, -1, 3, 0),), (-10, 10))
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna-residuo(csI.archi, (("1"): (0, 0), ("2"): (2.4, 0)), costi: true, scala: 0.85,
+    note: (("1"): ((0, 0.6), text(fill: verde, $d_1 = 0$)), ("2"): ((0, 0.6), text(fill: verde, $d_2 = infinity$)))),
+  [*Un caso vuoto*. Un arco $(1, 2)$ con $c_(1 2) = -1$ e $u_(1 2) = 3$, con $b_1 = -10$ e $b_2 = 10$. L'inizializzazione lo satura: $e_1 = #csI.passi.first().e.at(1)$, $e_2 = #csI.passi.first().e.at(2)$, quindi $O_x = {1}$ e $D_x = {2}$. Nel grafo residuo (a sinistra, con costo e capacità) resta solo l'arco $(2, 1)$, e da 1 non si arriva a 2: $d_2 = infinity$, il problema è vuoto.])
+
+*Perché funziona*. Lo pseudoflusso iniziale è minimale, e ogni passo manda flusso su un cammino di costo minimo, quindi resta minimale (teorema di minimalità). Per questo il grafo residuo non ha mai cicli negativi, e l'albero dei cammini minimi si può sempre costruire. L'algoritmo si ferma quando tutti gli sbilanciamenti sono nulli: lo pseudoflusso è allora minimale e ammissibile, cioè un *flusso ottimo*. È il rovescio della cancellazione di cicli:
+#align(center, table(columns: 3, align: (left, left, left),
+  [], [cancellazione di cicli], [cammini minimi successivi],
+  [si parte da], [un flusso ammissibile], [uno pseudoflusso minimale],
+  [mantiene], [l'ammissibilità], [la minimalità],
+  [si ferma quando], [è ottimo (nessun ciclo negativo)], [è ammissibile (nodi bilanciati)],
+  [usa], [cicli di costo negativo], [cammini di costo minimo],
+))
+
+*Terminazione e complessità*. Con capacità e deficit interi, lo pseudoflusso e gli sbilanciamenti restano interi, e ogni $theta >= 1$. Sia $g(x) = sum_(i : e_x (i) > 0) e_x (i)$ lo *sbilanciamento complessivo*: a ogni iterazione $e_x (s)$ scende di $theta$ e $e_x (t)$ sale di $theta$, quindi $g(x)$ scende esattamente di $theta >= 1$, e l'algoritmo termina. All'inizio
+$ g = sum_((i, j) : c_(i j) < 0) u_(i j) + sum_(i : b_i > 0) b_i quad <= quad m U + n B $
+(con $U$ la capacità massima degli archi negativi e $B$ il deficit massimo): quanto mandano gli archi negativi saturati, più le richieste dei pozzi. Le iterazioni sono $O(g)$, ognuna con un SPT.L da $O(m n)$:
+$ O(g m n) $
+pseudopolinomiale, perché $g$ dipende dai valori di capacità e deficit.
+
+*Variante con i potenziali*. SPT.L serve solo perché nel grafo residuo ci sono archi di costo negativo. Si possono invece usare i *costi ridotti*: dato un vettore di *potenziali* $pi = (pi_i)_(i in N)$,
+$ c^pi_(i j) = c_(i j) - pi_i + pi_j. $
+*I cammini minimi non cambiano*: il costo ridotto di un cammino da $s$ a $t$ è $c(P) - pi_s + pi_t$, perché i potenziali dei nodi in mezzo si cancellano, e $pi_s$ e $pi_t$ sono uguali per tutti i cammini da $s$ a $t$. Come potenziali si prendono le etichette dell'ultimo albero dei cammini minimi cambiate di segno, $pi = -d$: per le condizioni di Bellman $d_i + c_(i j) >= d_j$, cioè $c^pi_(i j) = c_(i j) + d_i - d_j >= 0$. Con costi ridotti tutti non negativi si può usare Dijkstra con heap, $O(m log n)$ invece di $O(m n)$ a iterazione. A ogni iterazione si calcola l'albero coi costi ridotti, si manda il flusso e si aggiorna $pi = -d$. (Questa alternanza fra flusso e potenziali è l'idea degli algoritmi *primali-duali*, la base di quelli moderni.)
+
+== Problemi di accoppiamento <accoppiamento>
+
+L'assegnamento l'abbiamo già modellato (@assegnamento); con gli algoritmi di flusso ora si sa anche risolvere.
+
+*Accoppiamento di massima cardinalità*. È dato un grafo non orientato *bipartito* $G = (I union J, E)$: i lati collegano elementi di $I$ a elementi di $J$ e dicono quali coppie sono possibili (per esempio lavoratori e lavori). Ogni elemento si può accoppiare con al più un elemento dell'altro insieme, e si vuole il *massimo numero di coppie*. È un flusso massimo:
+- ogni lato ${i, j}$ diventa un arco $(i, j)$ da $I$ a $J$ con capacità 1;
+- una sorgente $s$ è collegata a ogni nodo di $I$, e ogni nodo di $J$ a un pozzo $t$, sempre con capacità 1.
+
+La capacità 1 su $(s, i)$ impedisce a $i$ di avere due compagni, quella su $(j, t)$ lo impedisce a $j$. Il valore del flusso massimo è il numero massimo di coppie, e le coppie sono gli archi fra $I$ e $J$ con flusso 1.
+
+#let accEK = edmonds-karp(12, ACC, 11, 12)
+#let coppie(archi) = archi.filter(e => e.at(0) <= 5 and e.at(1) >= 6 and e.at(1) <= 10 and e.at(4) == 1).map(e => [#nomeB(e.at(0))-#nomeB(e.at(1))]).join[, ]
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  rete(posB, ACC.filter(e => e.at(0) <= 10 and e.at(1) <= 10).map(e => (nomeB(e.at(0)), nomeB(e.at(1)))), scala: 1,
+    evid: accEK.archi.filter(e => e.at(0) <= 10 and e.at(1) <= 10 and e.at(4) == 1).map(e => chiave(nomeB, e))),
+  table(columns: 2, align: (left, left), inset: 4pt,
+    [cammino aumentante (Edmonds-Karp)], [coppie dopo],
+    ..{
+      let a = ACC
+      let righe = ()
+      for (c, th, v) in accEK.passi {
+        a = componi(a, c, th)
+        righe += (freccia(c, nome: nomeB), coppie(a))
+      }
+      righe
+    }))
+
+$I = {0, dots, 4}$ in basso, $J = {5, dots, 9}$ in alto; $s$ e $t$ non sono disegnati. Edmonds-Karp guarda i vicini in ordine di numero, e a destra ci sono i cammini che trova. Il quarto passa per $5 -> 0$ e $6 -> 2$ *al contrario*: scioglie le coppie 0-5 e 2-6 e ne fa tre nuove, 1-5, 0-6 e 2-7. Un cammino così alterna lati liberi e lati già accoppiati, e si chiama *cammino alternante*. Alla visita successiva $t$ non si raggiunge: l'accoppiamento massimo (in blu) ha #esce(accEK.archi, 11) coppie. Il nodo 4 resta da solo: la visita lo raggiunge da $s$, ma il suo unico vicino, 9, è già preso da 3, e infatti 4 sta in $N_s = #(${#accEK.Ns.sorted(key: k => calc.rem(k, 11)).map(k => if k == 11 { $s$ } else { $#(k - 1)$ }).join($, $)}$)$.
+
+Con $U = 1$ la complessità dei cammini aumentanti diventa $O(n m U) = O(n m)$: i problemi di accoppiamento sono facili.
+
+*Assegnamento di costo minimo*. Ora i lati del grafo bipartito $G = (O union D, E)$ hanno un costo $c_(i j)$, e si vuole un accoppiamento *perfetto* (ogni nodo accoppiato) di costo minimo. È un flusso di costo minimo:
+- $b_i = -1$ per ogni $i in O$ e $b_j = 1$ per ogni $j in D$;
+- ogni lato diventa un arco $(i, j)$ da $O$ a $D$, con capacità 1 e costo $c_(i j)$.
+
+Ogni flusso ammissibile intero è un accoppiamento perfetto, e quello di costo minimo è l'assegnamento ottimo. Si risolve coi cammini minimi successivi: ogni iterazione manda un'unità lungo un cammino di costo minimo, cioè assegna un nodo di $O$ a uno di $D$ (riassegnando, se serve, quelli lungo il cammino). Servono $|O| = n / 2$ iterazioni, finché l'accoppiamento è perfetto o si scopre che non esiste. La complessità è $O(n^2 m)$ con SPT.L, $O(n m log n)$ con Dijkstra e i potenziali.
+
 #heading(numbering: none)[Riepilogo]
 
 *Trucchi di modellazione*
@@ -2547,4 +2721,6 @@ Di nuovo pseudopolinomiale.
   [cammini aumentanti], [un cammino qualsiasi in $G_x$], $O(m n U)$, [flusso massimo; capacità intere],
   [Edmonds-Karp], [visita a ventaglio (fila)], $O(m^2 n)$, [flusso massimo; cammini con meno archi],
   [cancellazione di cicli], [ciclo negativo in $G_x$ (Bellman-Ford)], $O((overline(c) - underline(c)) n m^2 U)$, [MCF; parte da un flusso ammissibile],
+  [cammini minimi successivi], [cammino minimo da $O_x$ al nodo di $D_x$ più vicino], $O(g m n)$, [MCF; parte da uno pseudoflusso minimale; con i potenziali Dijkstra],
+  [accoppiamento], [Edmonds-Karp con capacità 1], $O(n m)$, [cammini alternanti],
 ))
