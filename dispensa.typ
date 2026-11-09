@@ -100,9 +100,9 @@
   }
 })
 
-// grafo orientato: archi = ((a, b), ...), etichette = ("a-b": contenuto), evid = ("a-b", ...) archi in blu,
-// note = (nome: ((dx, dy), contenuto)) scritte accanto ai nodi
-#let rete(nodi, archi, etichette: (:), evid: (), note: (:), colori: (:), scala: 0.8) = canvas(length: scala * 1cm, {
+// grafo orientato: archi = ((a, b), ...), etichette = ("a-b": contenuto), evid = ("a-b", ...) archi in blu, rossi = in rosso,
+// note = (nome: ((dx, dy), contenuto)) scritte accanto ai nodi, posiz = ("a-b": dove mettere l'etichetta, da 0 a 1; di solito a metà)
+#let rete(nodi, archi, etichette: (:), evid: (), rossi: (), note: (:), colori: (:), posiz: (:), scala: 0.8) = canvas(length: scala * 1cm, {
   import draw: *
   let r = 0.32
   for (a, b) in archi {
@@ -110,11 +110,15 @@
     let (dx, dy) = (q.at(0) - p.at(0), q.at(1) - p.at(1))
     let l = calc.sqrt(dx * dx + dy * dy)
     let (ux, uy) = (dx / l, dy / l)
-    let c = if evid.contains(a + "-" + b) { blu } else { grigio }
-    line((p.at(0) + r * ux, p.at(1) + r * uy), (q.at(0) - r * ux, q.at(1) - r * uy),
-      stroke: (if c == blu { 1.6pt } else { 0.8pt }) + c, mark: (end: "stealth", fill: c))
+    // se c'è anche l'arco opposto (grafo residuo) ognuno dei due si sposta alla sua destra, così non si sovrappongono
+    let o = if archi.contains((b, a)) { 0.12 } else { 0 }
+    let (ox, oy) = (uy * o, -ux * o)
+    let c = if rossi.contains(a + "-" + b) { rosso } else if evid.contains(a + "-" + b) { blu } else { grigio }
+    line((p.at(0) + r * ux + ox, p.at(1) + r * uy + oy), (q.at(0) - r * ux + ox, q.at(1) - r * uy + oy),
+      stroke: (if c == grigio { 0.8pt } else { 1.6pt }) + c, mark: (end: "stealth", fill: c))
     let e = etichette.at(a + "-" + b, default: none)
-    if e != none { content((p.at(0) + dx / 2, p.at(1) + dy / 2), box(fill: white, inset: 1.5pt, text(7pt, e))) }
+    let (f, k) = if o > 0 { (0.38, 2.6) } else { (posiz.at(a + "-" + b, default: 0.5), 0) }
+    if e != none { content((p.at(0) + f * dx + k * ox, p.at(1) + f * dy + k * oy), box(fill: white, inset: 1.5pt, text(7pt, e))) }
   }
   for (n, p) in nodi {
     circle(p, radius: r, fill: colori.at(n, default: white), stroke: 0.7pt)
@@ -380,6 +384,124 @@
   }
   (p: p, passi: passi, costo: costo)
 }
+
+// ---- flussi: archi = ((i, j, c, u, x), ...): costo, capacità, flusso; nel flusso massimo c = 0 ----
+#let senza-costi(archi) = archi.map(((i, j, u, x)) => (i, j, 0, u, x))
+#let con-flusso(archi, x) = archi.enumerate().map(((k, (i, j, c, u, _))) => (i, j, c, u, x.at(k)))
+// grafo residuo: (i, j, capacità residua, costo); concorde se x < u, discorde (j, i) se x > 0
+#let residuo(archi) = {
+  let r = ()
+  for (i, j, c, u, x) in archi {
+    if x < u { r.push((i, j, u - x, c)) }
+    if x > 0 { r.push((j, i, x, -c)) }
+  }
+  r
+}
+#let esce(archi, i) = archi.filter(e => e.at(0) == i).map(e => e.at(4)).sum(default: 0) - archi.filter(e => e.at(1) == i).map(e => e.at(4)).sum(default: 0)
+// cammino o ciclo dato come nodi (n0, n1, ...): (a, b) concorde se l'arco esiste e non è saturo, altrimenti discorde
+#let lati-cammino(archi, nodi) = range(nodi.len() - 1).map(k => {
+  let (a, b) = (nodi.at(k), nodi.at(k + 1))
+  let f = archi.position(e => e.at(0) == a and e.at(1) == b and e.at(4) < e.at(3))
+  if f != none { (f, 1) } else { (archi.position(e => e.at(0) == b and e.at(1) == a and e.at(4) > 0), -1) }
+})
+#let capacita(archi, nodi) = calc.min(..lati-cammino(archi, nodi).map(((k, v)) =>
+  if v == 1 { archi.at(k).at(3) - archi.at(k).at(4) } else { archi.at(k).at(4) }))
+#let costo-cammino(archi, nodi) = lati-cammino(archi, nodi).map(((k, v)) => v * archi.at(k).at(2)).sum()
+#let componi(archi, nodi, th) = {
+  let a = archi
+  for (k, v) in lati-cammino(archi, nodi) { a.at(k).at(4) += v * th }
+  a
+}
+#let costo(archi) = archi.map(e => e.at(2) * e.at(4)).sum()
+// visita a ventaglio (fila) del grafo residuo da s: p_j = predecessore, 0 = mai raggiunto
+#let ventaglio(n, archi, s) = {
+  let R = residuo(archi)
+  let p = (0,) * (n + 1)
+  p.at(s) = s
+  let Q = (s,)
+  while Q.len() > 0 {
+    let i = Q.first()
+    Q = Q.slice(1)
+    for (a, j, r, c) in R.filter(e => e.at(0) == i).sorted(key: e => e.at(1)) {
+      if p.at(j) == 0 { p.at(j) = i; Q.push(j) }
+    }
+  }
+  p
+}
+// Edmonds-Karp: passi = (cammino, theta, valore), Ns = nodi raggiunti nell'ultima visita
+#let edmonds-karp(n, archi, s, t) = {
+  let a = archi
+  let passi = ()
+  let p = ventaglio(n, a, s)
+  while p.at(t) != 0 {
+    let nodi = (t,)
+    while nodi.first() != s { nodi.insert(0, p.at(nodi.first())) }
+    let th = capacita(a, nodi)
+    a = componi(a, nodi, th)
+    passi.push((nodi, th, esce(a, s)))
+    p = ventaglio(n, a, s)
+  }
+  (archi: a, passi: passi, Ns: range(1, n + 1).filter(k => p.at(k) != 0))
+}
+// taglio (Ns, Nt): archi diretti A+ e inversi A-
+#let diretti(archi, Ns) = archi.filter(e => e.at(0) in Ns and e.at(1) not in Ns)
+#let inversi(archi, Ns) = archi.filter(e => e.at(1) in Ns and e.at(0) not in Ns)
+#let flusso-taglio(archi, Ns) = diretti(archi, Ns).map(e => e.at(4)).sum(default: 0) - inversi(archi, Ns).map(e => e.at(4)).sum(default: 0)
+#let cap-taglio(archi, Ns) = diretti(archi, Ns).map(e => e.at(3)).sum(default: 0)
+// SPT.L con tutti i nodi come radici: etichette a 0, predecessore = se stesso, Q = tutti i nodi
+#let spt-tutte(n, archi, max: 200) = {
+  let d = (0,) * (n + 1)
+  let p = range(n + 1)
+  let Q = range(1, n + 1)
+  let passi = ()
+  while Q.len() > 0 and passi.len() < max {
+    let i = Q.first()
+    Q = Q.slice(1)
+    let cambi = ()
+    for (a, j, c) in uscenti(archi, i) {
+      if d.at(i) + c < d.at(j) { d.at(j) = d.at(i) + c; p.at(j) = i; cambi.push((j, d.at(j))); if j not in Q { Q.push(j) } }
+    }
+    passi.push((i, cambi, Q))
+  }
+  (d: d, p: p, passi: passi)
+}
+// disegni: mostra = quali numeri scrivere sugli archi, fra "c" (costo), "u" (capacità), "x" (flusso), in ordine;
+// nome(k) = come si chiama il nodo k
+#let chiave(nome, e) = nome(e.at(0)) + "-" + nome(e.at(1))
+#let lungo(nodi, nome: str) = range(nodi.len() - 1).map(k => (nome(nodi.at(k)) + "-" + nome(nodi.at(k + 1)), nome(nodi.at(k + 1)) + "-" + nome(nodi.at(k)))).flatten()
+#let disegna-flusso(archi, pos, nome: str, mostra: "ux", evid: (), rossi: (), colori: (:), note: (:), posiz: (:), scala: 0.8) = rete(pos,
+  archi.map(e => (nome(e.at(0)), nome(e.at(1)))),
+  etichette: archi.map(e => (chiave(nome, e),
+    $#mostra.clusters().map(m => str(e.at(if m == "c" { 2 } else if m == "u" { 3 } else { 4 }))).join(", ")$)).to-dict(),
+  evid: evid, rossi: rossi, colori: colori, note: note, posiz: posiz, scala: scala)
+// grafo residuo: etichetta = capacità residua (con costi: "costo, capacità")
+#let disegna-residuo(archi, pos, nome: str, costi: false, evid: (), colori: (:), note: (:), scala: 0.8) = {
+  let R = residuo(archi)
+  rete(pos, R.map(e => (nome(e.at(0)), nome(e.at(1)))),
+    etichette: R.map(e => (chiave(nome, e), if costi { $#e.at(3), #e.at(2)$ } else { $#e.at(2)$ })).to-dict(),
+    evid: evid, colori: colori, note: note, scala: scala)
+}
+#let freccia(nodi, nome: str) = $#nodi.map(nome).join($->$)$
+#let azzurro = rgb("#d6e4ff")
+
+// grafo d'esempio del flusso massimo: s = 1, t = 6
+#let posF = (("1"): (0, 1), ("2"): (1.9, 2.1), ("3"): (1.9, -0.1), ("4"): (4.1, 2.1), ("5"): (4.1, -0.1), ("6"): (6, 1))
+#let F6 = senza-costi(((1, 2, 5, 0), (1, 3, 9, 0), (2, 3, 7, 0), (2, 4, 3, 0), (2, 5, 4, 0), (3, 5, 10, 0), (4, 6, 10, 0), (5, 4, 2, 0), (5, 6, 8, 0)))
+// stesso grafo con u_24 = 5 e un flusso di valore 13 già dato
+#let F6b = con-flusso(F6.map(e => if e.at(0) == 2 and e.at(1) == 4 { (2, 4, 0, 5, 0) } else { e }), (5, 8, 0, 3, 2, 8, 5, 2, 8))
+// ammissibilità di un MCF: nodi 1..6, super sorgente s = 7, super pozzo t = 8
+#let nomeA(k) = if k == 7 { "s" } else if k == 8 { "t" } else { str(k) }
+#let posA = (("s"): (-1.4, 1), ("1"): (0.4, 2.2), ("3"): (2.6, 2.2), ("6"): (4.8, 2.2), ("2"): (0.4, -0.2), ("4"): (2.6, -0.2), ("5"): (4.8, -0.2), ("t"): (6.6, 1))
+#let AM = ((3, 1, 6, 3, 0), (3, 6, 2, 3, 0), (1, 4, 3, 3, 0), (3, 2, 4, 1, 0), (4, 3, 3, 4, 0), (3, 5, 1, 4, 0), (4, 6, 6, 3, 0), (2, 1, 1, 7, 0), (2, 4, 1, 7, 0), (4, 5, 6, 3, 0), (6, 5, 3, 9, 0))
+#let bAM = (-4, -7, 0, 0, 4, 7)
+#let posizA = ("1-4": 0.3, "3-2": 0.3, "3-5": 0.3, "4-6": 0.3) // le diagonali si incrociano a metà
+#let AMst = AM + ((7, 1, 0, 4, 0), (7, 2, 0, 7, 0), (5, 8, 0, 4, 0), (6, 8, 0, 7, 0))
+#let allarga(archi, i, j) = archi.map(e => if e.at(0) == i and e.at(1) == j { (i, j, e.at(2), e.at(3) + 1, e.at(4)) } else { e })
+// MCF d'esempio: il nodo 1 manda 10 unità al nodo 5; flusso iniziale = quello trovato dal flusso massimo
+#let posM = (("1"): (0, 1.2), ("2"): (3.3, 1.2), ("3"): (2.8, 3.1), ("4"): (2.8, -0.7), ("5"): (6.3, 1.2))
+#let M5 = ((1, 2, 10, 10, 10), (1, 3, 3, 2, 0), (1, 4, 1, 2, 0), (2, 3, 1, 7, 0), (2, 4, 3, 4, 0), (2, 5, 10, 10, 10), (3, 5, 5, 6, 0), (4, 5, 6, 5, 0))
+#let cicliM = ((1, 3, 5, 2, 1), (1, 4, 5, 2, 1), (2, 3, 5, 2), (2, 4, 5, 2))
+#let noteM = (("1"): ((0, -0.62), text(fill: verde, $-10$)), ("5"): ((0, -0.62), text(fill: verde, $10$)))
 
 #let si = text(fill: verde, weight: "bold")[✓]
 #let no = text(fill: red, weight: "bold")[✗]
@@ -1588,7 +1710,13 @@ Ogni esempio del capitolo serve a insegnare uno o più trucchi. All'esame il tes
   [calcolare le etichette di un albero, controllare le condizioni di Bellman e dimostrare il teorema;],
   [eseguire a mano Bellman-Ford (SPT.L) e Dijkstra (SPT.S), e sapere quale usare e quanto costano;],
   [numerare topologicamente un grafo e trovare i cammini minimi su un grafo aciclico;],
-  [eseguire Kruskal e Prim, e spiegare in cosa Prim è diverso da Dijkstra.],
+  [eseguire Kruskal e Prim, e spiegare in cosa Prim è diverso da Dijkstra;],
+  [scrivere il modello del flusso massimo, controllare se un flusso dato è ammissibile e quanto vale;],
+  [dire cos'è un cammino aumentante e calcolarne la capacità; costruire il grafo residuo;],
+  [eseguire Edmonds-Karp, trovare il taglio di capacità minima e dimostrare che flusso e taglio sono ottimi;],
+  [dire se un MCF è ammissibile col flusso massimo, e quali capacità aumentare se non lo è;],
+  [calcolare sbilanciamenti e costo di cammini e cicli, costruire il grafo residuo pesato e migliorare un flusso cancellando cicli di costo negativo;],
+  [enunciare la decomposizione degli pseudoflussi, dimostrare il criterio di ottimalità e certificarlo con Bellman-Ford a radici multiple.],
 )
 
 Molti problemi di ottimizzazione hanno la forma di un grafo: a volte è evidente (reti stradali, ferroviarie, di telecomunicazioni, idriche, elettriche), a volte nasce dal modo in cui si scrive il modello. Nel capitolo precedente i problemi su grafi li abbiamo solo *scritti*; qui li *risolviamo*, con algoritmi fatti apposta, a partire dai più semplici.
@@ -2069,6 +2197,12 @@ L'etichetta $-M$ dei nodi già nell'albero non può mai essere migliorata, quind
 
 Stesso albero di Kruskal, di costo #pr.costo. Per esempio, quando esce 4 il lato ${2, 4}$ fa scendere l'etichetta di 2 da 8 a 2: da quel momento 2 è più vicino all'albero passando da 4 che da 1.
 
+*Complessità di Prim*. Ogni lato è guardato una volta, $O(m)$; il resto dipende da come si cerca il minimo in $Q$:
+- con una coda *non ordinata* ogni estrazione guarda tutti i nodi: $O(n^2 + m) = O(n^2)$;
+- con un *heap binario*: $O(m log n)$, come Kruskal.
+
+Su un grafo denso ($m approx n^2$) Kruskal fa $O(n^2 log n)$ e Prim con la coda non ordinata $O(n^2)$, che è meglio. Negli altri casi, dice il prof, di solito si preferisce Kruskal.
+
 #block(breakable: false, nota[*Prim e Dijkstra* (domanda da orale): stesso schema, etichette diverse.
 #table(columns: 3, align: (left, left, left),
   [], [Dijkstra], [Prim],
@@ -2078,6 +2212,306 @@ Stesso albero di Kruskal, di costo #pr.costo. Per esempio, quando esce 4 il lato
   [nodo estratto], [etichetta definitiva], [etichetta $-M$: è nell'albero],
   [minimizza], [il costo di ogni cammino], [la somma dei costi dei lati],
 )])
+
+== Flusso massimo <mf>
+
+Nei cammini minimi gli archi hanno un costo ma nessuna capacità; qui è il contrario. È dato un grafo orientato $G = (N, A)$ in cui ogni arco ha una *capacità* $u_(i j)$ (nelle slide $mu_(i j)$), più due nodi speciali: la *sorgente* $s$, da cui parte il flusso, e il *pozzo* $t$, dove arriva. Si vuole la quantità massima di flusso che si può portare da $s$ a $t$ rispettando le capacità: è il limite di una rete idrica, elettrica o di telecomunicazioni.
+
+Il *valore* $v$ del flusso è quello che esce da $s$, cioè quello che entra in $t$. Non è un dato ma una variabile, ed è proprio quella da massimizzare. Il modello, che il prof può chiedere:
+$
+max & v \
+& sum_((j, i) in B S(i)) x_(j i) - sum_((i, j) in F S(i)) x_(i j) = cases(-v quad & i = s, v & i = t, 0 & "altrimenti") \
+& 0 <= x_(i j) <= u_(i j) quad (i, j) in A
+$
+Da $s$ esce $v$, in $t$ entra $v$, e in tutti gli altri nodi quello che entra esce.
+
+*Anche il flusso massimo è un flusso di costo minimo*. Si aggiunge un *arco di ritorno* $(t, s)$ con capacità infinita e costo $-1$, e si dà costo 0 a tutti gli altri archi. Ora tutti i nodi hanno deficit 0 e il flusso gira chiuso (si parla di *circolazione*): quello che arriva in $t$ torna in $s$ lungo l'arco di ritorno, che quindi porta $x_(t s) = v$. Minimizzare il costo $-v$ vuol dire massimizzare $v$.
+
+#let avista = {
+  let a = F6
+  let righe = ()
+  for c in ((1, 2, 4, 6), (1, 3, 5, 6), (1, 3, 5, 4, 6), (1, 2, 5, 4, 6)) {
+    let th = capacita(a, c)
+    let (k, v) = lati-cammino(a, c).find(((k, v)) => (if v == 1 { a.at(k).at(3) - a.at(k).at(4) } else { a.at(k).at(4) }) == th)
+    a = componi(a, c, th)
+    righe.push((c, (a.at(k).at(0), a.at(k).at(1)), th, esce(a, 1)))
+  }
+  (archi: a, righe: righe)
+}
+*Un esempio a occhio*. Nel grafo qui sotto $s = 1$ e $t = 6$, e su ogni arco c'è la coppia $u_(i j), x_(i j)$: capacità e flusso. Si parte dal flusso nullo, che è sempre ammissibile (rispetta capacità e conservazione) e vale $v = 0$. Per aumentarlo si cerca un cammino da $s$ a $t$ e ci si manda tutto il flusso che può portare. Il limite è il suo arco più stretto, il *collo di bottiglia*: conta la *capacità residua* $u_(i j) - x_(i j)$, cioè quanto posto resta sull'arco, perché il flusso che c'è già non si può superare.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna-flusso(avista.archi, posF, scala: 0.85),
+  table(columns: 4, align: (left, center, center, center), inset: 4pt,
+    [cammino], [collo di bottiglia], $theta$, $v$,
+    ..avista.righe.map(((c, (i, j), th, v)) => (freccia(c), $(#i, #j)$, $#th$, $#v$)).flatten()))
+
+A destra i quattro cammini, in ordine; a sinistra il flusso finale. Dopo il secondo cammino $(1, 3)$ ha capacità residua $9 - 8 = 1$, ed è lei a limitare il terzo. Alla fine nessun cammino da 1 a 6 ha posto su tutti gli archi, perché $(1, 3)$, $(2, 4)$, $(5, 4)$ e $(5, 6)$ sono *saturi* ($x_(i j) = u_(i j)$). Che 13 sia il massimo lo dimostreranno i tagli.
+
+#let cb = (1, 3, 5, 2, 4, 6)
+#let F6c = componi(F6b, cb, capacita(F6b, cb))
+*Percorrere un arco al contrario*. Lo stesso grafo, ma con $u_(2 4) = 5$ e un flusso già dato. Negli esercizi capita spesso, e prima di tutto si controlla che il flusso sia *ammissibile*: le capacità sono rispettate e in ogni nodo diverso da $s$ e $t$ entra quanto esce (in 2 entra 5 ed esce $3 + 2$, in 3 entra 8 ed esce 8, in 4 entra $3 + 2$ ed esce 5, in 5 entra $2 + 8$ ed esce $2 + 8$). Il valore è quello che esce da $s$: $v = 5 + 8 = 13$.
+
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  disegna-flusso(F6b, posF, evid: lungo(cb), scala: 0.85),
+  text(16pt)[→],
+  disegna-flusso(F6c, posF, scala: 0.85)))
+
+Andando solo in avanti non si passa: $(1, 2)$, $(5, 4)$ e $(5, 6)$ sono saturi. Ma il cammino in blu, #freccia(cb), usa $(2, 5)$ *al contrario*, e vuol dire *togliere* flusso da $(2, 5)$: un'unità che andava da 2 a 5 resta in 2 e prende un'altra strada, $2 -> 4 -> 6$, mentre in 5 il posto lasciato libero lo occupa l'unità che arriva da 3. Su un arco percorso al contrario si può togliere al massimo il flusso che c'è. Il collo di bottiglia è quindi il minimo fra le capacità residue degli archi percorsi nel loro verso e i flussi di quelli percorsi al contrario: $min{9 - 8, 10 - 8, 2, 5 - 3, 10 - 5} = #capacita(F6b, cb)$. Il flusso passa a $v = #esce(F6c, 1)$ (a destra). Così l'algoritmo può correggere le decisioni prese prima.
+
+#definizione[cammino aumentante][Dato un flusso ammissibile $x$, un *cammino aumentante* è un cammino *non necessariamente orientato* $P$ da $s$ a $t$. I suoi archi si dividono in *concordi* $P^+$, percorsi nel loro verso, e *discordi* $P^-$, percorsi al contrario. La sua *capacità* è
+$ theta(P, x) = min { min{u_(i j) - x_(i j) : (i, j) in P^+}, quad min{x_(i j) : (i, j) in P^-} } $
+e deve essere $theta(P, x) > 0$.]
+
+La capacità dipende dal cammino *e dal flusso*: sugli archi concordi conta quanto posto resta, su quelli discordi quanto flusso si può togliere. Se $theta(P, x) = 0$, cioè un arco concorde è saturo o uno discorde è vuoto, il cammino non porta niente e non è aumentante. Il prof avverte che all'esame chiede cos'è un cammino aumentante: la risposta è questa definizione.
+
+Se esiste un cammino aumentante il flusso non è massimo, perché si può mandare di più. Mandare $theta$ lungo $P$ si chiama *composizione* di flusso e cammino:
+$ x(theta) = x ⊕ theta P, quad quad x_(i j)(theta) = cases(x_(i j) + theta quad & (i, j) in P^+, x_(i j) - theta & (i, j) in P^-, x_(i j) & "altrimenti") $
+
+#teorema[Teorema][Se $x$ è un flusso ammissibile di valore $v$, $P$ un cammino aumentante e $0 <= theta <= theta(P, x)$, allora $x ⊕ theta P$ è un flusso ammissibile di valore $v + theta$.]
+
++ *Capacità*: sugli archi concordi si aggiunge al più la capacità residua, su quelli discordi si toglie al più il flusso che c'è. Nessun arco va sopra $u_(i j)$ o sotto 0.
++ *Conservazione*: in ogni nodo in mezzo al cammino le due modifiche si compensano. Se da una parte arriva $theta$ in più, dall'altra ne esce $theta$ in più oppure ne entra $theta$ in meno.
++ *Valore*: il primo arco tocca $s$, quindi da $s$ esce $theta$ in più.
+
+*Il grafo residuo*. Trovare a occhio i cammini aumentanti, con gli archi da percorrere al contrario, non è facile. Si costruisce allora un grafo in cui diventano cammini normali. Il *grafo residuo* $G_x = (N, A_x)$ ha gli stessi nodi di $G$ e, per ogni arco $(i, j)$:
+- se *non è saturo* ($x_(i j) < u_(i j)$), un arco *concorde* $(i, j)$ con capacità $u_(i j) - x_(i j)$: quanto si può ancora mandare;
+- se *non è vuoto* ($x_(i j) > 0$), un arco *discorde* $(j, i)$ con capacità $x_(i j)$: quanto si può rimandare indietro.
+
+Un arco né saturo né vuoto dà quindi due archi, uno per verso. $G_x$ dipende dal flusso e cambia a ogni iterazione.
+
+#teorema[Teorema][A ogni cammino aumentante da $s$ a $t$ in $G$ corrisponde uno e un solo cammino *orientato* da $s$ a $t$ in $G_x$.]
+
+Per cercare un cammino aumentante basta quindi una *visita* di $G_x$ partendo da $s$. Se la visita arriva a $t$ il cammino c'è e il flusso si può aumentare; se non ci arriva, non ci sono cammini aumentanti.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna-residuo(F6c, posF, colori: ("1": azzurro), scala: 0.85),
+  [Il grafo residuo del flusso di valore #esce(F6c, 1), sulle frecce la capacità residua. $(1, 2)$ e $(1, 3)$ sono saturi: di loro restano solo gli archi discordi, che *entrano* in 1. Da 1 non esce niente, la visita si ferma subito (raggiunge solo il nodo azzurro) e non ci sono cammini aumentanti. I due archi saturi sono un collo di bottiglia per tutta la rete: un *taglio*.])
+
+*Tagli*. Un *taglio* $(N_s, N_t)$ è una partizione dei nodi in due parti, con $s in N_s$ e $t in N_t = N without N_s$. I suoi archi sono di due tipi:
+- *diretti*, da $N_s$ a $N_t$: $A^+(N_s, N_t) = {(i, j) in A : i in N_s, j in N_t}$;
+- *inversi*, da $N_t$ a $N_s$: $A^-(N_s, N_t) = {(i, j) in A : i in N_t, j in N_s}$.
+
+Il *flusso del taglio* è quello che passa da $N_s$ a $N_t$ meno quello che torna indietro; la *capacità del taglio* è il massimo che può passare da $N_s$ a $N_t$. Gli archi inversi nella capacità non contano: al massimo li si lascia vuoti.
+$ x(N_s, N_t) = sum_((i, j) in A^+(N_s, N_t)) x_(i j) - sum_((i, j) in A^-(N_s, N_t)) x_(i j) quad quad u(N_s, N_t) = sum_((i, j) in A^+(N_s, N_t)) u_(i j) $
+
+Tre tagli dello stesso flusso di valore #esce(F6c, 1):
+#align(center, table(columns: 4, align: (left, left, center, center),
+  [$N_s$], [archi diretti], [flusso], [capacità],
+  ..((1,), (1, 2, 3), (1, 2, 3, 4, 5)).map(Ns => (insieme(Ns), diretti(F6c, Ns).map(e => $(#e.at(0), #e.at(1))$).join[, ],
+    $#flusso-taglio(F6c, Ns)$, $#cap-taglio(F6c, Ns)$)).flatten()))
+Il flusso è sempre #esce(F6c, 1), la capacità cambia. Non è un caso:
+
+#teorema[Teorema][Per ogni flusso ammissibile $x$ di valore $v$ e ogni taglio $(N_s, N_t)$: $quad v = x(N_s, N_t) <= u(N_s, N_t)$.]
+
+Nessun flusso può superare la capacità di un taglio: il taglio di capacità minima è il collo di bottiglia della rete. *Dimostrazione*, in due parti.
++ $x(N_s, N_t) <= u(N_s, N_t)$: ogni arco diretto porta al più la sua capacità, quindi la prima somma è al più $u(N_s, N_t)$, e poi le si toglie una quantità $>= 0$.
++ $v = x(N_s, N_t)$: si sommano i vincoli di conservazione di tutti i nodi di $N_t$.
+  - A destra resta solo $v$: il nodo $t in N_t$ dà $v$, gli altri nodi di $N_t$ danno 0 ($s$ non c'è, sta in $N_s$).
+  - A sinistra, un arco con tutti e due gli estremi in $N_t$ compare due volte: col $+$ nel vincolo del nodo in cui entra, col $-$ in quello da cui esce. Quindi si cancella.
+  - Restano gli archi con un solo estremo in $N_t$: col $+$ quelli che ci entrano (i diretti), col $-$ quelli che ne escono (gli inversi). È proprio $x(N_s, N_t)$.
+
+#teorema[Teorema (flusso massimo – taglio minimo)][Il valore massimo dei flussi ammissibili è uguale alla capacità minima dei tagli che separano $s$ da $t$.]
+
+Si vede col grafo residuo. Se una visita di $G_x$ da $s$ non raggiunge $t$:
++ i nodi raggiunti formano $N_s$ e gli altri $N_t$: è un taglio;
++ ogni arco diretto è *saturo*, altrimenti in $G_x$ ci sarebbe il suo arco concorde e la visita avrebbe raggiunto la sua testa;
++ ogni arco inverso è *vuoto*, altrimenti ci sarebbe il suo arco discorde, che va da $N_s$ a $N_t$;
++ quindi $v = x(N_s, N_t) = u(N_s, N_t) - 0$. Nessun flusso può valere di più (supererebbe la capacità di questo taglio) e nessun taglio può avere capacità più piccola (sarebbe sotto il valore di questo flusso).
+
+Il flusso è *massimo* e il taglio è di *capacità minima*. Nell'esempio, $N_s = {1}$ ha capacità $5 + 9 = 14$, uguale al flusso. L'algoritmo risolve così due problemi insieme. Il secondo è il problema di *interdizione ottima*: quali archi tagliare per separare $s$ da $t$ spendendo il meno possibile (il prof cita la guerra, per decidere cosa abbattere perché i carri armati non arrivino, e gli attacchi alle reti). Un problema di massimo e uno di minimo con lo stesso valore ottimo si dicono *duali*: è un'idea che tornerà.
+
+*L'algoritmo dei cammini aumentanti*. Si parte dal flusso nullo e si ripete: costruisci $G_x$, cercaci un cammino orientato da $s$ a $t$, se c'è manda il flusso.
+```
+procedure x = Cammini-Aumentanti(G, u, s, t)
+  x = 0;
+  for (;;) {
+    (p, θ) = Trova-Cammino(G, u, s, t, x);
+    if (p[t] == 0) then break;      // t non raggiunto: x è massimo
+    x = Aumenta-Flusso(x, p, s, t, θ);
+  }
+```
+- *Trova-Cammino* visita $G_x$ da $s$ e per ogni nodo $j$ tiene il predecessore $p[j]$ e la capacità $d(j)$ del cammino trovato da $s$ a $j$. Si parte da $d(s) = +infinity$; arrivando in $j$ con l'arco concorde $(i, j)$, $d(j) = min{d(i), u_(i j) - x_(i j)}$; con l'arco discorde (cioè $(j, i)$ percorso al contrario), $d(j) = min{d(i), x_(j i)}$. Alla fine $theta = d(t)$.
+- Se $p[t]$ non è mai stato modificato, $t$ non è stato raggiunto: il flusso è ottimo.
+- *Aumenta-Flusso* risale da $t$ a $s$ con i predecessori e fa la composizione $x ⊕ theta P$.
+
+#teorema[Teorema][Se tutte le capacità sono intere, l'algoritmo termina in un numero finito di iterazioni, e il flusso massimo che trova è intero.]
+
+Partendo da 0 con capacità intere, ogni $theta$ è intero e positivo: a ogni iterazione $v$ cresce *almeno di 1*. E $v$ non supera la capacità del taglio $N_s = {s}$, che ha al più $n - 1$ archi diretti di capacità al più $U = max u_(i j)$. Quindi le iterazioni sono al più $(n - 1) U$, ognuna con una visita da $O(m)$:
+$ O(m n U) $
+È una complessità *pseudopolinomiale*: dipende dal valore $U$ di un dato, non solo da $n$ e $m$, e $U$ può essere enorme. Con capacità non intere l'algoritmo potrebbe fare passi sempre più piccoli e non terminare; nei calcolatori però i numeri sono interi o razionali, e il problema in pratica non c'è.
+
+#let posU = (("1"): (0, 1), ("2"): (1.8, 2), ("3"): (1.8, 0), ("4"): (3.6, 1))
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  rete(posU, (("1", "2"), ("1", "3"), ("2", "3"), ("2", "4"), ("3", "4")), scala: 0.85,
+    etichette: ("1-2": $10^6$, "1-3": $10^6$, "2-3": $1$, "2-4": $10^6$, "3-4": $10^6$)),
+  [Il caso peggiore dipende da come si scelgono i cammini. Qui il flusso massimo è $2 dot 10^6$, e con $1 -> 2 -> 4$ e $1 -> 3 -> 4$ si trova in due iterazioni. Scegliendo male, si alternano $1 -> 2 -> 3 -> 4$ e $1 -> 3 -> 2 -> 4$ (che usa $(2, 3)$ al contrario): ogni volta $theta = 1$, e servono due milioni di iterazioni.])
+
+#let ek = edmonds-karp(6, F6, 1, 6)
+*Edmonds-Karp*. Come si scelgono i cammini dipende da come si visita $G_x$. L'algoritmo di *Edmonds-Karp* visita $G_x$ *a ventaglio* (breadth first), con $Q$ gestita come una *fila*, e così trova sempre il cammino aumentante col *minimo numero di archi*. Nell'esempio da un milione trova subito $1 -> 2 -> 4$ e $1 -> 3 -> 4$. Sul grafo dell'esempio a occhio ($u_(2 4) = 3$), dal flusso nullo e guardando i vicini in ordine di numero:
+
+#grid(columns: (1fr, auto), gutter: 1.2em, align: horizon,
+  table(columns: 4, align: (center, left, center, center), inset: 4pt,
+    [visita], [cammino in $G_x$], $theta$, $v$,
+    ..ek.passi.enumerate().map(((k, (c, th, v))) => ([#(k + 1)], freccia(c), $#th$, $#v$)).flatten(),
+    [#(ek.passi.len() + 1)], [$t$ non raggiunto], [], []),
+  disegna-flusso(ek.archi, posF, colori: ek.Ns.map(k => (str(k), azzurro)).to-dict(),
+    rossi: diretti(ek.archi, ek.Ns).map(e => str(e.at(0)) + "-" + str(e.at(1))), scala: 0.85))
+
+All'ultima visita i nodi raggiunti (in azzurro) sono $N_s = #insieme(ek.Ns)$. Gli archi diretti del taglio, in rosso, sono tutti saturi, e la capacità è $#diretti(ek.archi, ek.Ns).map(e => str(e.at(3))).join(" + ") = #cap-taglio(ek.archi, ek.Ns) = v$. Il flusso finale è diverso da quello trovato a occhio, ma il valore è lo stesso: anche quello era massimo.
+
+*Complessità di Edmonds-Karp*. I cammini trovati non diventano mai più corti. Quando un arco si satura lo si può riusare solo al contrario, e un cammino che lo usa al contrario è più lungo di due archi. Siccome un cammino ha al più $n - 1$ archi, ogni arco si satura $O(n)$ volte. Ogni iterazione ne satura almeno uno, quindi le iterazioni sono $O(n m)$, e ognuna costa una visita $O(m)$:
+$ O(m^2 n) $
+Non dipende più da $U$: è *polinomiale*, e funziona anche con capacità non intere. Su un grafo denso fa $O(n^5)$; esistono algoritmi da $O(n^3)$.
+
+*Più sorgenti e più pozzi*. Con un insieme di sorgenti $S$ e uno di pozzi $T$ si fa come nelle trasformazioni equivalenti (@reti): una super sorgente $s$ collegata a ogni sorgente, e ogni pozzo collegato a un super pozzo $t$, con archi di capacità infinita (o abbastanza grande, per esempio la somma di tutte le capacità). Si può anche non costruire il grafo nuovo: si mettono in $Q$ all'inizio tutte le sorgenti, e ci si ferma appena si raggiunge un pozzo qualsiasi; quando $Q$ si svuota si è trovato un taglio saturo fra $S$ e $T$. Se una sorgente $i$ o un pozzo $j$ può dare o ricevere al massimo $u_i$ o $u_j$, quella è la capacità dell'arco $(s, i)$ o $(j, t)$. Servirà subito, nel flusso di costo minimo.
+
+== Flusso di costo minimo <mcf>
+
+È l'ultimo problema su grafi del corso, e mette insieme i due precedenti. Gli archi hanno sia un *costo* $c_(i j)$ per unità di flusso sia una *capacità* $u_(i j)$; i nodi hanno un deficit $b_i$ ($b_i < 0$ sorgente, $b_i > 0$ pozzo, $b_i = 0$ transito, con $sum_i b_i = 0$). Il modello è quello di @reti: fra tutti i flussi ammissibili (conservazione e capacità) si cerca quello di costo $sum c_(i j) x_(i j)$ minimo. L'albero dei cammini minimi ha costi ma non capacità, il flusso massimo capacità ma non costi: per l'MCF serviranno tutti e due.
+
+*Prima domanda: esiste un flusso?* Un MCF può non avere soluzioni ammissibili. Nel caso più semplice si devono portare 5 unità su un arco che ne porta 1:
+#align(center, rete((("i"): (0, 0), ("j"): (2.4, 0)), (("i", "j"),), etichette: ("i-j": $u = 1$), scala: 0.85,
+  note: (("i"): ((-1, 0), $b_i = -5$), ("j"): ((1, 0), $b_j = 5$))))
+Su un grafo più grande non si vede a occhio, e si usa il flusso massimo su un grafo modificato:
+- una super sorgente $s$, collegata a ogni sorgente $i$ con un arco di capacità $-b_i$ (quanto offre);
+- un super pozzo $t$, a cui ogni pozzo $j$ è collegato con un arco di capacità $b_j$ (quanto chiede);
+- deficit e costi non si guardano: si cerca il flusso massimo da $s$ a $t$.
+
+Le capacità degli archi nuovi impediscono a una sorgente di mandare più di quanto offre, e a un pozzo di ricevere più di quanto chiede. Quindi:
+- se il flusso massimo *satura tutti gli archi uscenti da $s$* (e allora anche quelli entranti in $t$), cioè vale $sum_(j in D) b_j$, esiste un flusso ammissibile, ed è quello trovato;
+- se vale meno, nessun flusso soddisfa tutte le richieste: il problema è *vuoto*, e ci si ferma.
+
+#let am1 = edmonds-karp(8, AMst, 7, 8)
+#let AMst2 = allarga(AMst, 1, 4)
+#let am2 = edmonds-karp(8, AMst2, 7, 8)
+#let am3 = edmonds-karp(8, allarga(AMst2, 4, 6), 7, 8)
+#let taglio-disegno(r, archi) = disegna-flusso(archi, posA, nome: nomeA, mostra: "u", scala: 0.86, posiz: posizA,
+  colori: r.Ns.map(k => (nomeA(k), azzurro)).to-dict(), rossi: diretti(archi, r.Ns).map(e => chiave(nomeA, e)))
+#let nomeAm(k) = if k == 7 { $s$ } else if k == 8 { $t$ } else { $#k$ }
+#let insiemeA(Ns) = ${#Ns.sorted(key: k => calc.rem(k, 7)).map(nomeAm).join($, $)}$
+#let archiA(l) = l.map(e => $(#nomeAm(e.at(0)), #nomeAm(e.at(1)))$).join[, ]
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna-flusso(AM, posA.pairs().filter(((k, v)) => k not in ("s", "t")).to-dict(), mostra: "cu", scala: 1.05, posiz: posizA,
+    note: range(1, 7).map(k => (str(k), ((0, if posA.at(str(k)).at(1) > 1 { 0.62 } else { -0.62 }), text(fill: verde, $#bAM.at(k - 1)$)))).to-dict()),
+  [Sugli archi $c_(i j), u_(i j)$, accanto ai nodi in verde il deficit. Le sorgenti sono 1 e 2, che offrono 4 e 7; i pozzi sono 5 e 6, che chiedono 4 e 7. Bisogna spostare 11 unità.])
+
+Si risolve il flusso massimo sul grafo con $s$ e $t$ (sotto a sinistra, solo le capacità). Le iterazioni sono parecchie e il prof le lascia come esercizio; il flusso massimo vale #esce(am1.archi, 7). L'ultima visita raggiunge solo $N_s = #insiemeA(am1.Ns)$ (in azzurro): gli archi diretti del taglio, #archiA(diretti(am1.archi, am1.Ns)), sono saturi, e quelli inversi, #archiA(inversi(am1.archi, am1.Ns)), sono vuoti. La capacità del taglio è $#cap-taglio(am1.archi, am1.Ns) < 11$: *il problema non è ammissibile*. Il taglio che si sperava era $N_s = {s}$, con tutti gli archi uscenti da $s$ saturi.
+
+#align(center, grid(columns: 2, column-gutter: 1.5em, align: horizon,
+  taglio-disegno(am1, AMst), taglio-disegno(am2, AMst2)))
+
+*Su quali archi aumentare la capacità?* È una domanda d'esame tipica. Per portare più flusso bisogna allargare il collo di bottiglia, cioè gli archi del taglio di capacità minima:
+- gli archi *vuoti* del taglio non servono: non portavano niente prima e non porteranno niente dopo;
+- fra quelli *saturi* serve quello che fa passare davvero flusso in più. Allargare $(s, 2)$ non aiuta: il flusso in più arriverebbe al massimo in 1, e da 1 l'unico arco che esce, $(1, 4)$, è già saturo. Si allarga quindi $(1, 4)$, da 3 a 4.
+
+Col nuovo grafo (sopra a destra) il flusso massimo resta #esce(am2.archi, 7), perché c'è un *altro* taglio di capacità minima #cap-taglio(am2.archi, am2.Ns): $N_s = #insiemeA(am2.Ns)$, con archi diretti #archiA(diretti(am2.archi, am2.Ns)). Allargando anche $(4, 6)$ di 1, il flusso massimo diventa #esce(am3.archi, 7) e il problema è ammissibile: servono *2 archi*. L'algoritmo trova solo il taglio minimo più vicino a $s$, ma possono essercene altri con la stessa capacità. Se due tagli minimi avessero un arco in comune, basterebbe allargare quello.
+
+#let passiM = {
+  let a = M5
+  let righe = ()
+  for C in cicliM {
+    let th = capacita(a, C)
+    let cc = costo-cammino(a, C)
+    a = componi(a, C, th)
+    righe.push((C, th, cc, costo(a)))
+  }
+  (archi: a, righe: righe)
+}
+*Il flusso trovato è il più economico?* Un esempio più piccolo, con $c_(i j), u_(i j), x_(i j)$ sugli archi: il nodo 1 deve mandare 10 unità al nodo 5 (in verde i deficit). Il flusso massimo, con $s$ collegato a 1 e 5 collegato a $t$ con capacità 10, trova al primo colpo il cammino $1 -> 2 -> 5$ e ci manda 10 unità: il flusso è ammissibile (a sinistra) e costa $10 dot 10 + 10 dot 10 = #costo(M5)$.
+
+#align(center, grid(columns: 3, column-gutter: 1em, align: horizon,
+  disegna-flusso(M5, posM, mostra: "cux", note: noteM, scala: 0.72),
+  text(16pt)[→],
+  disegna-flusso(passiM.archi, posM, mostra: "cux", note: noteM, scala: 0.72)))
+
+Si può fare di meglio. Se 2 unità invece di passare per $1 -> 2 -> 5$ passano per $1 -> 3 -> 5$, il flusso resta ammissibile (da 1 escono sempre 10 unità, in 5 ne entrano sempre 10) e il costo cambia di $2 dot (3 + 5) - 2 dot (10 + 10) = -24$: si scende a 176. Di più non si può, perché $(1, 3)$ ha capacità 2. Quello che si è fatto è mandare flusso lungo un *ciclo*, $1 -> 3 -> 5 -> 2 -> 1$, con gli ultimi due archi percorsi al contrario. Continuando così:
+#align(center, table(columns: 4, align: (left, center, center, center),
+  [ciclo], [capacità $theta$], [costo del ciclo], [costo del flusso],
+  [—], [], [], [#costo(M5)],
+  ..passiM.righe.map(((C, th, cc, c)) => (freccia(C), $#th$, $#cc$, $#c$)).flatten()))
+Il flusso finale è a destra nel disegno. Altri miglioramenti non si vedono: è l'ottimo? Per rispondere servono alcune definizioni.
+
+*Pseudoflussi*. Uno *pseudoflusso* è un vettore $x$ che rispetta le capacità, $0 <= x_(i j) <= u_(i j)$, ma non per forza la conservazione. Quanto un nodo è fuori equilibrio lo dice il suo *sbilanciamento*: quello che entra, meno quello che esce, meno il deficit.
+$ e_x (i) = sum_((j, i) in B S(i)) x_(j i) - sum_((i, j) in F S(i)) x_(i j) - b_i $
+- $e_x (i) > 0$: *eccedenza*, al nodo resta flusso, come se fosse una sorgente; questi nodi formano $O_x$;
+- $e_x (i) < 0$: *difetto*, al nodo manca flusso, come se fosse un pozzo; questi nodi formano $D_x$;
+- $e_x (i) = 0$: il nodo è *bilanciato*.
+
+Un flusso ammissibile è uno pseudoflusso con tutti i nodi bilanciati. La somma degli sbilanciamenti è sempre 0 (ogni arco entra in un nodo ed esce da un altro, e $sum b_i = 0$), quindi se non ci sono eccedenze ($O_x = emptyset$) non ci sono nemmeno difetti. Con $x = 0$ si ha $e_x (i) = -b_i$: le sorgenti sono in eccedenza e i pozzi in difetto. Il prof avverte che negli esercizi capita di partire da uno pseudoflusso con degli sbilanciamenti.
+
+*Cammini e cicli aumentanti*. Si definiscono come nel flusso massimo, ma fra due nodi $s$ e $t$ qualsiasi, non per forza sorgente e pozzo. $P_(s t)$ è un cammino non orientato da $s$ a $t$, con capacità $theta(P_(s t), x)$ calcolata nello stesso modo, ed è aumentante se $theta(P_(s t), x) > 0$. La composizione $x ⊕ theta P_(s t)$ porta $theta$ unità da $s$ a $t$ e cambia lo sbilanciamento *solo dei due estremi*: $e_x (s)$ scende di $theta$, $e_x (t)$ sale di $theta$, i nodi in mezzo restano come sono.
+
+Se $s = t$ il cammino è un *ciclo* $C$, e non cambia nessuno sbilanciamento. Ecco a cosa servono i cicli: *un ciclo aumentante trasforma un flusso ammissibile in un altro flusso ammissibile*. Il *costo* di un cammino o di un ciclo, e l'effetto sul costo del flusso, sono
+$ c(P) = sum_((i, j) in P^+) c_(i j) - sum_((i, j) in P^-) c_(i j) quad quad c(x ⊕ theta P) = c(x) + theta c(P) $
+Sugli archi concordi si paga il costo, su quelli discordi lo si risparmia. Per migliorare un flusso ammissibile si cerca quindi un *ciclo aumentante di costo negativo*. Nell'esempio il primo ciclo costa $3 + 5 - 10 - 10 = -12$, e con $theta = 2$ il costo passa da 200 a $200 - 24 = 176$.
+
+*Il grafo residuo pesato*. Come nel flusso massimo, i cicli aumentanti si cercano su un grafo residuo, a cui ora si aggiungono i costi. Per uno pseudoflusso $x$, $G_x$ ha:
+- se $x_(i j) < u_(i j)$, l'arco concorde $(i, j)$ con capacità $u_(i j) - x_(i j)$ e costo $c_(i j)$;
+- se $x_(i j) > 0$, l'arco discorde $(j, i)$ con capacità $x_(i j)$ e costo $-c_(i j)$: rimandare indietro un'unità fa risparmiare il suo costo.
+
+#teorema[Lemma][Ogni cammino aumentante in $G$ corrisponde a un cammino orientato in $G_x$ con lo stesso costo.]
+
+Un ciclo aumentante di costo negativo in $G$ è quindi un *ciclo orientato di costo negativo* in $G_x$. E un algoritmo che li trova c'è già: SPT.L con la fila, cioè Bellman-Ford (@spt), che se ne accorge quando un nodo entra in $Q$ troppe volte.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna-residuo(M5, posM, costi: true, evid: lungo(cicliM.first()).filter(k => k in ("1-3", "3-5", "5-2", "2-1")), scala: 0.8),
+  [Il grafo residuo pesato del primo flusso, con $c, u$ sulle frecce. $(1, 2)$ e $(2, 5)$ sono saturi e restano solo al contrario, con costo $-10$. In blu il ciclo orientato $1 -> 3 -> 5 -> 2 -> 1$: costa $3 + 5 - 10 - 10 = -12$, e la sua capacità è $min{2, 6, 10, 10} = 2$.])
+
+*L'algoritmo di cancellazione di cicli*. Si trova un flusso ammissibile col flusso massimo, poi lo si migliora con cicli di costo negativo finché ce ne sono.
+```
+procedure (x, caso) = Cancella-Cicli(G, c, b, u)
+  (x, caso) = Flusso-Ammissibile(G, b, u);
+  if (caso == "vuoto") then return;
+  for (;;) {
+    (C, θ) = Trova-Ciclo(G, c, u, x);
+    if (θ == 0) then break;         // nessun ciclo di costo negativo
+    x = Cambia-Flusso(x, C, θ);
+  }
+```
+- *Flusso-Ammissibile*: il flusso massimo sul grafo con super sorgente e super pozzo; dice "vuoto" se non satura gli archi uscenti da $s$.
+- *Trova-Ciclo*: Bellman-Ford sul grafo residuo pesato; restituisce un ciclo orientato di costo negativo $C$ e la sua capacità $theta = theta(C, x)$, oppure $theta = 0$ se non ce ne sono.
+- *Cambia-Flusso*: la composizione $x ⊕ theta C$, con tutta la capacità del ciclo.
+
+Il nome viene da qui: mandando tutta la capacità, almeno un arco concorde del ciclo si satura o almeno uno discorde si svuota. Nel grafo residuo successivo quell'arco cambia verso, e il ciclo non c'è più: è stato *cancellato*.
+
+#teorema[Teorema di decomposizione degli pseudoflussi][Dati due pseudoflussi diversi $x'$ e $x''$ sullo stesso grafo, esistono al più $k = n + m$ cammini o cicli aumentanti rispetto a $x'$, $P_1, dots, P_k$ (di cui al più $m$ cicli), e $k$ numeri $0 < theta_i <= theta(P_i, x')$, tali che
+$ x'' = x' ⊕ theta_1 P_1 ⊕ dots ⊕ theta_k P_k. $
+Ogni $P_i$ che è un cammino va da un nodo $s_i$ a un nodo $t_i$ con $e_(x') (s_i) != e_(x'') (s_i)$ e $e_(x') (t_i) != e_(x'') (t_i)$. Se $e_(x') = e_(x'')$, i $P_i$ sono tutti cicli.]
+
+È, dice il prof, il teorema più lungo del corso. In parole: da uno pseudoflusso si passa a qualunque altro con un numero finito di composizioni. I cammini sistemano i nodi che hanno sbilanciamenti diversi nei due pseudoflussi, i cicli spostano flusso senza toccare gli sbilanciamenti. In particolare, *fra due flussi ammissibili bastano al più $m$ cicli*. Si enuncia per gli pseudoflussi perché servirà anche nell'algoritmo successivo.
+
+#teorema[Criterio di ottimalità][Un flusso ammissibile $x$ è ottimo se e solo se non esistono cicli aumentanti di costo negativo.]
+
+*Dimostrazione*.
+- Se esiste un ciclo aumentante $C$ con $c(C) < 0$, il flusso $x ⊕ theta(C, x) C$ è ammissibile e costa meno: $x$ non era ottimo.
+- Viceversa, per assurdo: non ci sono cicli aumentanti di costo negativo, ma $x$ non è ottimo, quindi c'è un flusso $x^*$ con $c(x^*) < c(x)$.
+  + Per la decomposizione $x^* = x ⊕ theta_1 C_1 ⊕ dots ⊕ theta_k C_k$, e sono tutti cicli perché $x$ e $x^*$ sono flussi ammissibili.
+  + Quindi $c(x^*) = c(x) + theta_1 c(C_1) + dots + theta_k c(C_k)$.
+  + Ogni $theta_i > 0$, perché i cicli sono aumentanti, e ogni $c(C_i) >= 0$, perché di costo negativo non ce ne sono. Allora $c(x^*) >= c(x)$.
+  + Questo contraddice $c(x^*) < c(x)$.
+
+#let RM = residuo(passiM.archi).map(((i, j, r, c)) => (i, j, c))
+#let bfM = spt-tutte(5, RM)
+*Come si dimostra che non ci sono più cicli negativi?* Bisogna davvero far girare Bellman-Ford sul grafo residuo pesato, ma con quale radice? Con una radice sola, un ciclo negativo in una parte del grafo che da lì non si raggiunge non verrebbe visto. Si prendono allora *tutti i nodi come radici*, come per le radici multiple (@spt): ogni etichetta $d_i = 0$, ogni predecessore $p_i = i$, e tutti i nodi in $Q$. Se l'algoritmo termina, le etichette rispettano le condizioni di Bellman e non ci sono cicli negativi. Etichette e albero dei cammini minimi sono un *certificato di ottimalità*.
+
+#grid(columns: (auto, 1fr), gutter: 1.2em, align: horizon,
+  disegna-residuo(passiM.archi, posM, costi: true, scala: 0.95,
+    evid: range(1, 6).filter(k => bfM.p.at(k) != k).map(k => str(bfM.p.at(k)) + "-" + str(k)),
+    note: range(1, 6).map(k => (str(k), ((if k == 1 { -0.3 } else if k == 5 { 0.3 } else if k == 2 { 0.8 } else { 0.85 }, if k == 4 { -0.2 } else if k == 3 { 0.2 } else if k == 2 { 0.4 } else { 0.6 }),
+      text(fill: verde, $#bfM.d.at(k), #bfM.p.at(k)$)))).to-dict()),
+  traccia(bfM.passi, col: [violano Bellman → nuova $d_j$]))
+
+Il grafo residuo pesato del flusso finale, di costo #costo(passiM.archi). In verde accanto a ogni nodo $d_i, p_i$ alla fine, in blu l'albero dei predecessori. Bellman-Ford si ferma dopo #bfM.passi.len() estrazioni: non ci sono cicli negativi, e il flusso di costo #costo(passiM.archi) è ottimo.
+
+*Terminazione e complessità*. Cancella-Cicli generalizza i cammini aumentanti, e come loro con valori irrazionali potrebbe non terminare. Con capacità e deficit *interi* il flusso resta intero a ogni passo: si parte da un flusso intero, e ogni $theta$ dipende da capacità e flussi, quindi è intero. Se anche i costi sono interi, siano
+$ overline(c) = max{0, max c_(i j)}, quad quad underline(c) = min{0, min c_(i j)}, quad quad U = max u_(i j). $
+Ogni flusso costa fra $m underline(c) U$ (tutti gli archi pieni al costo più negativo) e $m overline(c) U$ (tutti pieni al costo più alto). A ogni iterazione $c(C) <= -1$ e $theta >= 1$, quindi $c(x') = c(x) + theta c(C) <= c(x) - 1$: il costo scende almeno di 1. Nel caso peggiore si parte dal costo massimo e si scende di 1 alla volta fino al minimo, con $O((overline(c) - underline(c)) m U)$ iterazioni, ognuna con un Bellman-Ford da $O(n m)$:
+$ O((overline(c) - underline(c)) n m^2 U) $
+Di nuovo pseudopolinomiale.
+
+*Si può migliorare?* I punti deboli sono tre: la soluzione iniziale può essere lontana dall'ottimo; i cicli trovati possono migliorare poco (costo poco negativo o capacità piccola); trovarli richiede molte iterazioni. Cercare il ciclo più negativo è NP-arduo, mentre il ciclo di *costo medio* minimo (costo diviso numero di archi) si trova in tempo polinomiale e rende polinomiale l'algoritmo; anche lo *scaling*, che lavora prima sulle cifre più significative di capacità e costi, dà una complessità polinomiale. Il miglioramento più semplice è partire da una soluzione più vicina all'ottimo: il flusso massimo cerca cammini qualsiasi, mentre conviene cercare cammini aumentanti *di costo minimo* nel grafo residuo pesato.
 
 #heading(numbering: none)[Riepilogo]
 
@@ -2109,5 +2543,8 @@ Stesso albero di Kruskal, di costo #pr.costo. Per esempio, quando esce 4 il lato
   [SPT.S, Dijkstra], [etichetta minima], [$O(n^2)$, heap $O(m log n)$], [solo costi $>= 0$; ogni nodo esce una volta],
   [SPT.Acyclic], [ordine topologico], $O(m)$, [solo grafi aciclici; costi negativi ammessi],
   [Kruskal], [lati per costo crescente], $O(m log n)$, [stop a $n - 1$ lati],
-  [Prim], [etichetta minima (costo del lato)], [], [nodi dell'albero a $-M$],
+  [Prim], [etichetta minima (costo del lato)], [$O(n^2)$, heap $O(m log n)$], [nodi dell'albero a $-M$],
+  [cammini aumentanti], [un cammino qualsiasi in $G_x$], $O(m n U)$, [flusso massimo; capacità intere],
+  [Edmonds-Karp], [visita a ventaglio (fila)], $O(m^2 n)$, [flusso massimo; cammini con meno archi],
+  [cancellazione di cicli], [ciclo negativo in $G_x$ (Bellman-Ford)], $O((overline(c) - underline(c)) n m^2 U)$, [MCF; parte da un flusso ammissibile],
 ))
