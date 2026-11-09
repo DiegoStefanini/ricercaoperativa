@@ -2215,7 +2215,7 @@ Su un grafo denso ($m approx n^2$) Kruskal fa $O(n^2 log n)$ e Prim con la coda 
 
 == Flusso massimo <mf>
 
-Nei cammini minimi gli archi hanno un costo ma nessuna capacità; qui è il contrario. È dato un grafo orientato $G = (N, A)$ in cui ogni arco ha una *capacità* $u_(i j)$ (nelle slide $mu_(i j)$), più due nodi speciali: la *sorgente* $s$, da cui parte il flusso, e il *pozzo* $t$, dove arriva. Si vuole la quantità massima di flusso che si può portare da $s$ a $t$ rispettando le capacità: è il limite di una rete idrica, elettrica o di telecomunicazioni.
+Nei cammini minimi gli archi hanno un costo ma nessuna capacità; qui è il contrario. È dato un grafo orientato $G = (N, A)$ in cui ogni arco ha una *capacità* $u_(i j)$ (il prof la scrive anche $mu_(i j)$), più due nodi speciali: la *sorgente* $s$, da cui parte il flusso, e il *pozzo* $t$, dove arriva. Si vuole la quantità massima di flusso che si può portare da $s$ a $t$ rispettando le capacità: è il limite di una rete idrica, elettrica o di telecomunicazioni.
 
 Il *valore* $v$ del flusso è quello che esce da $s$, cioè quello che entra in $t$. Non è un dato ma una variabile, ed è proprio quella da massimizzare. Il modello, che il prof può chiedere:
 $
